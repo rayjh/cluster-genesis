@@ -106,10 +106,11 @@ class Gen(object):
         dbase = Database()
         try:
             dbase.validate_config(self.args.config_file)
+            print('Success: Config file validation passed')
         except UserException as exc:
-            print('Fail:', exc.message, file=sys.stderr)
+            print(exc.message, file=sys.stderr)
+            print('Failure: Config file validation.')
             sys.exit(1)
-        print('Success: Config file validation passed')
 
     def _cluster_hardware(self):
         print('\nDiscovering and validating cluster hardware')
@@ -344,15 +345,6 @@ class Gen(object):
 
         print('Success: Gathered Client MAC addresses')
 
-    def _lookup_interface_names(self):
-        try:
-            _run_playbook("lookup_interface_names.yml")
-        except UserException as exc:
-            print('Fail:', exc.message, file=sys.stderr)
-            sys.exit(1)
-
-        print('Success: Interface names collected')
-
     def _config_client_os(self):
         _run_playbook("configure_operating_systems.yml")
         print('Success: Client operating systems are configured')
@@ -380,6 +372,11 @@ class Gen(object):
         try:
             if self.args.deploy:
                 cmd = argparse_gen.Cmd.DEPLOY.value
+        except AttributeError:
+            pass
+        try:
+            if self.args.post_deploy:
+                cmd = argparse_gen.Cmd.POST_DEPLOY.value
         except AttributeError:
             pass
 
@@ -429,11 +426,6 @@ class Gen(object):
                 self.args.add_cobbler_distros = self.args.all
                 self.args.add_cobbler_systems = self.args.all
                 self.args.install_client_os = self.args.all
-                self.args.ssh_keyscan = self.args.all
-                self.args.gather_mac_addr = self.args.all
-                self.args.data_switches = self.args.all
-                self.args.lookup_interface_names = self.args.all
-                self.args.config_client_os = self.args.all
 
             if argparse_gen.is_arg_present(self.args.create_inventory):
                 self._create_inventory()
@@ -454,21 +446,32 @@ class Gen(object):
             if argparse_gen.is_arg_present(self.args.all):
                 print("\n\nPress enter to continue with node configuration ")
                 print("and data switch setup, or 'T' to terminate ")
-                print("Cluster Genesis.  (To restart, type: 'gen post-deploy')")
+                print("Cluster Genesis.  (To restart, type: 'gen post-deploy "
+                      "--all')")
                 resp = raw_input("\nEnter or 'T': ")
                 if resp == 'T':
                     sys.exit('Cluster Genesis terminated at user request')
+                cmd = argparse_gen.Cmd.POST_DEPLOY.value
+
+        if cmd == argparse_gen.Cmd.POST_DEPLOY.value:
+            if gen.is_container():
+                print('Fail: Invalid subcommand in container', file=sys.stderr)
+                sys.exit(1)
+            print('Post deploy stuff')
+            if argparse_gen.is_arg_present(self.args.all):
+                self.args.ssh_keyscan = self.args.all
+                self.args.gather_mac_addr = self.args.all
+                self.args.data_switches = self.args.all
+                self.args.config_client_os = self.args.all
+
             if argparse_gen.is_arg_present(self.args.ssh_keyscan):
                 self._ssh_keyscan()
             if argparse_gen.is_arg_present(self.args.gather_mac_addr):
                 self._gather_mac_addr()
-            if argparse_gen.is_arg_present(self.args.lookup_interface_names):
-                self._lookup_interface_names()
             if argparse_gen.is_arg_present(self.args.config_client_os):
                 self._config_client_os()
             if argparse_gen.is_arg_present(self.args.all):
                 self._config_data_switches()
-
 
 def _run_playbook(playbook):
     log = logger.getlogger()
@@ -485,6 +488,7 @@ def _run_playbook(playbook):
 
 if __name__ == '__main__':
     args = argparse_gen.get_parsed_args()
+    print(args)
     logger.create(
         args.log_level_file[0],
         args.log_level_print[0])

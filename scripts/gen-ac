@@ -55,6 +55,14 @@ _gen()
         return 0
     fi
 
+    opts="-h --help --ssh-keyscan --gather-mac-addr --config-client-os "
+    opts+="-a --all -f -p"
+
+    if [[ ${cur} == * ]] && [[ ${prev} == post-deploy ]]; then
+        COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
+        return 0
+    fi
+
     opts="setup config validate deploy post-deploy"
 
     if [[ ${cur} == * ]] && [[ ${prev} == gen ]]; then
@@ -73,8 +81,7 @@ _gen()
 
     opts="-h --help -p --log-level-print -f --log-level-file"
 
-    if [[ ${cur} == * ]] && ([[ ${prev_3} == gen ]] || \
-        [[ ${prev} == post-deploy ]]); then
+    if [[ ${cur} == * ]] && [[ ${prev_3} == gen ]]; then
         COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
         return 0
     fi
