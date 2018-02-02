@@ -45,6 +45,7 @@ class Cmd(Enum):
     DEPLOY = DEPLOY_CMD
     POST_DEPLOY = POST_DEPLOY_CMD
 
+
 def get_args(parser_args=False):
     """Get 'gen' command arguments"""
 
@@ -281,6 +282,14 @@ def get_args(parser_args=False):
         help='Gather MAC addresses from switches and update inventory')
 
     parser_post_deploy.add_argument(
+        '--lookup-interface-names',
+        nargs='?',
+        default=ABSENT,
+        metavar='CONTAINER-NAME',
+        help=('Lookup OS assigned name of all interfaces configured with '
+              '\'rename: false\' and update inventory'))
+
+    parser_post_deploy.add_argument(
         '--config-client-os',
         nargs='?',
         default=ABSENT,
@@ -338,8 +347,7 @@ def _check_deploy(args, subparser):
             'one of the arguments --create-inventory --install-cobbler'
             ' --inv-add-ports-pxe --inv-add-ports-ipmi --download-os-images'
             ' --add-cobbler-distros --add-cobbler-systems --install-client-os'
-            ' --ssh-keyscan --gather-mac-addr --config-client-os -a/--all is'
-            ' required')
+            ' -a/--all is required')
 
 
 def _check_post_deploy(args, subparser):
