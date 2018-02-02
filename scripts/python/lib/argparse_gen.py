@@ -237,27 +237,6 @@ def get_args(parser_args=False):
         help='Initiate client OS installation(s)')
 
     parser_deploy.add_argument(
-        '--ssh-keyscan',
-        nargs='?',
-        default=ABSENT,
-        metavar='CONTAINER-NAME',
-        help='Collect client node and container SSH host keys')
-
-    parser_deploy.add_argument(
-        '--gather-mac-addr',
-        nargs='?',
-        default=ABSENT,
-        metavar='CONTAINER-NAME',
-        help='Gather MAC addresses')
-
-    parser_deploy.add_argument(
-        '--config-client-os',
-        nargs='?',
-        default=ABSENT,
-        metavar='CONTAINER-NAME',
-        help='Configure client node operating systems')
-
-    parser_deploy.add_argument(
         '-a', '--all',
         nargs='?',
         default=ABSENT,
