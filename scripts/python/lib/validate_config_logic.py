@@ -22,8 +22,7 @@ from __future__ import nested_scopes, generators, division, absolute_import, \
 
 from netaddr import IPNetwork
 
-import lib.logger as logger
-from lib.exception import UserException
+from lib.exception import UserCriticalException
 
 
 class ValidateConfigLogic(object):
@@ -36,10 +35,10 @@ class ValidateConfigLogic(object):
     CONFIG_VERSION = 'v2.0'
 
     def __init__(self, config):
-        self.log = logger.getlogger()
         self.config = config
         from lib.config import Config
         self.cfg = Config(self.config)
+        self.exc = ''
 
     def _validate_version(self):
         """Validate version
@@ -49,10 +48,8 @@ class ValidateConfigLogic(object):
         """
 
         if self.config.version != self.CONFIG_VERSION:
-            exc = "Config version '{}' is not supported".format(
+            self.exc += "Config version '{}' is not supported".format(
                 self.config.version)
-            self.log.error(exc)
-            raise UserException(exc)
 
     def _validate_netmask_prefix(self):
         """Validate netmask and prefix
@@ -62,7 +59,6 @@ class ValidateConfigLogic(object):
         Exception:
             If both or neither the netmask and prefix are specified.
         """
-        global exc
         msg_either = "Config 'deployer:' Either 'netmask' or 'prefix' \
             needs to be specified\n"
         msg_both = "Config 'deployer:' Both 'netmask' and 'prefix' can not \
@@ -82,11 +78,9 @@ class ValidateConfigLogic(object):
                     prefix = None
 
                 if netmask is None and prefix is None:
-                    exc += "%s - %s %s" % (netmask, prefix, msg_either)
-                    self.log.error(exc)
+                    self.exc += "%s - %s %s" % (netmask, prefix, msg_either)
                 if netmask is not None and prefix is not None:
-                    exc += "%s - %s %s" % (netmask, prefix, msg_both)
-                    self.log.error(exc)
+                    self.exc += "%s - %s %s" % (netmask, prefix, msg_both)
 
     def _validate_physical_interfaces(self):
         """ Validate that;
@@ -97,8 +91,6 @@ class ValidateConfigLogic(object):
             UserException if any of the above criteria fail
             in config.yml
         """
-
-        global exc
 
         def get_dupes(_list):
             found = []
@@ -116,15 +108,14 @@ class ValidateConfigLogic(object):
                 msg = ('\nSwitch "{}" in node template "{}" is not defined.'
                        '\nValid defined switches are: {}\n').format(
                     switch, ntmpl_lbl, sw_lbls)
-                exc += msg
+                self.exc += msg
 
         def validate_interface_defined(phy_ifc_lbl):
-            global exc
             if phy_ifc_lbl not in ifc_lbls:
                 msg = ('\nPhysical interface "{}" in node template "{}" '
                        '\nreferences an undefined interface.')
-                exc += msg.format(phy_ifc_lbl, ntmpl_lbl)
-                exc += '\nValid labels are: {}\n'.format(ifc_lbls)
+                self.exc += msg.format(phy_ifc_lbl, ntmpl_lbl)
+                self.exc += '\nValid labels are: {}\n'.format(ifc_lbls)
 
         def _add_ports_to_ports_list(switch, ports):
             if switch in ports_list:
@@ -153,7 +144,7 @@ class ValidateConfigLogic(object):
                            '"{}", \nphysical interface "{}"').format(
                         rename, ntmpl_lbl, phy_ifc_lbl)
                     msg += '\nValid values are "true" or "false"\n'
-                    exc += msg
+                    self.exc += msg
                 switch = self.cfg.get_ntmpl_phyintf_data_switch(
                     ntmpl_ind, phyintf_idx)
                 validate_switch_defined(switch)
@@ -171,7 +162,7 @@ class ValidateConfigLogic(object):
                            '"{}", \nphysical interface "{}"').format(
                         rename, ntmpl_lbl, phy_ifc_lbl)
                     msg += '\nValid values are "true" or "false"\n'
-                    exc += msg
+                    self.exc += msg
                 switch = self.cfg.get_ntmpl_phyintf_pxe_switch(
                     ntmpl_ind, phyintf_idx)
                 validate_switch_defined(switch)
@@ -192,16 +183,12 @@ class ValidateConfigLogic(object):
             if dupes:
                 msg = ('\nDuplicate port(s) defined on switch "{}"'
                        '\nDuplicate ports: {}\n'.format(switch, dupes))
-                exc += msg
-
-        if exc:
-            self.log.error('Config logic validation failed')
+                self.exc += msg
 
     def _validate_deployer_networks(self):
         """ Validate that for each deployer pxe interface and ipmi interface;
             - The container_ipaddr and bridge_ipaddr are in the same subnet.
         """
-        global exc
 
         self._validate_netmask_prefix()
 
@@ -216,10 +203,9 @@ class ValidateConfigLogic(object):
             cidr_bip = IPNetwork(bip + '/' + str(netp))
             net_b = str(IPNetwork(cidr_bip).network)
             if net_c != net_b:
-                exc += ("Config 'deployer: container_ipaddr:' and 'bridge_ipaddr:' "
-                        "need to be in the same subnet.\nContainer network {} \n"
-                        "Bridge network:   {}".format(net_c, net_b))
-                self.log.error('Config file logic validation failure')
+                self.exc += ("Config 'deployer: container_ipaddr:' and 'bridge_ipaddr:' "
+                             "need to be in the same subnet.\nContainer network {} \n"
+                             "Bridge network:   {}".format(net_c, net_b))
 
         netprefix = self.cfg.get_depl_netw_mgmt_prefix()
         cont_ip = self.cfg.get_depl_netw_mgmt_cont_ip()
@@ -233,19 +219,16 @@ class ValidateConfigLogic(object):
                 cidr_bip = IPNetwork(bip + '/' + str(netp))
                 net_b = str(IPNetwork(cidr_bip).network)
                 if net_c != net_b:
-                    exc += ("Config 'deployer: container_ipaddr:' and 'bridge_ipaddr:' "
-                            "need to be in the same subnet.\nContainer network {} \n"
-                            "Bridge network:   {}".format(net_c, net_b))
-                    self.log.error('Config file logic validation failure')
+                    self.exc += ("Config 'deployer: container_ipaddr:' and 'bridge_ipaddr:' "
+                                 "need to be in the same subnet.\nContainer network {} \n"
+                                 "Bridge network:   {}".format(net_c, net_b))
 
     def validate_config_logic(self):
         """Config logic validation"""
-        global exc
-        exc = ''
 
         self._validate_version()
         self._validate_physical_interfaces()
         self._validate_deployer_networks()
 
-        if exc:
-            raise UserException(exc)
+        if self.exc:
+            raise UserCriticalException(self.exc)
