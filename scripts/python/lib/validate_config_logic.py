@@ -21,8 +21,10 @@ from __future__ import nested_scopes, generators, division, absolute_import, \
     with_statement, print_function, unicode_literals
 
 from netaddr import IPNetwork
+import re
 
-from lib.exception import UserCriticalException
+from lib.exception import UserException, UserCriticalException
+import lib.logger as logger
 
 
 class ValidateConfigLogic(object):
@@ -223,12 +225,34 @@ class ValidateConfigLogic(object):
                                  "need to be in the same subnet.\nContainer network {} \n"
                                  "Bridge network:   {}".format(net_c, net_b))
 
+    def _validate_dhcp_lease_time(self):
+        """Validate DHCP lease time value
+
+        Lease time can be given as an int (seconds), int + m (minutes),
+        int + h (hours) or "infinite".
+
+        Exception:
+            Invalid lease time value
+        """
+
+        dhcp_lease_time = self.cfg.get_globals_dhcp_lease_time()
+
+        if not (re.match('^\d+[mh]{0,1}$', dhcp_lease_time) or
+                dhcp_lease_time == "infinite"):
+            exc = ("Config 'Globals: dhcp_lease_time: {}' has invalid value!"
+                   "\n".format(dhcp_lease_time))
+            exc += ('Value can be in seconds, minutes (e.g. "15m"),\n'
+                    'hours (e.g. "1h") or "infinite" (lease does not expire).')
+            self.log.error(exc)
+            raise UserException(exc)
+
     def validate_config_logic(self):
         """Config logic validation"""
 
         self._validate_version()
         self._validate_physical_interfaces()
         self._validate_deployer_networks()
+        self._validate_dhcp_lease_time()
 
         if self.exc:
             raise UserCriticalException(self.exc)
