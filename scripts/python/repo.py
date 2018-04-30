@@ -24,9 +24,9 @@ import sys
 import time
 import lib.logger as logger
 from subprocess import Popen, PIPE
-import code
+# import code
 
-from lib.genesis import GEN_PATH
+# from lib.genesis import GEN_PATH
 
 
 class local_repo(object):
@@ -67,12 +67,11 @@ class local_repo(object):
         self.log.info('Syncing remote repository {}'.format(self.repo_name))
         self.log.info('This can take many minutes or hours for large repositories')
         cmd = 'reposync -a {} -r {} -p /srv/repos/epel.staging -l -m'.format(self.arch, self.repo_name)
-        #resp, err = self._sub_proc_exec(cmd)
+        # resp, err = self._sub_proc_exec(cmd)
         proc = self._sub_proc_launch(cmd)
-        #code.interact(banner='sync_repo', local=dict(globals(), **locals()))
+        # code.interact(banner='sync_repo', local=dict(globals(), **locals()))
         cnt = 1
         rc = None
-        a = '\|/-'
         while rc is None:
             rc = proc.poll()
             print('\rwaiting for sync to finish. Time elapsed: min: {:3} sec: {:2}'.format(cnt // 60, cnt % 60), end="")
@@ -81,7 +80,7 @@ class local_repo(object):
             cnt += 1
         print('\n')
         resp, err = proc.communicate()
-        if rc < 0:
+        if rc != 0:
             self.log.error(err)
         else:
             self.log.info('Sync process finished succesfully')
@@ -126,6 +125,7 @@ class local_repo(object):
             f.write('gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-{}\n'.format(self.rhel_ver))
             f.write('gpgcheck=1\n')
 
+
 if __name__ == '__main__':
     """ Configures or deconfigures data switches.
     Args: optional log level or optional deconfig in any order
@@ -147,5 +147,5 @@ if __name__ == '__main__':
 
     repo = local_repo(args.repo_name)
     repo.create_remote_link()
-    #repo.sync_repo()
+    repo.sync_repo()
     repo.create_local_link()
