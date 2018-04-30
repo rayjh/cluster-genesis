@@ -29,6 +29,7 @@ import enable_deployer_networks
 import enable_deployer_gateway
 import validate_cluster_hardware
 import configure_mgmt_switches
+import utils
 import download_os_images
 import lxc_conf
 import lib.argparse_gen as argparse_gen
@@ -504,6 +505,14 @@ class Gen(object):
         _run_playbook("configure_operating_systems.yml")
         print('Success: Client operating systems are configured')
 
+    def _scan_pxe_network(self):
+        print('Scanning cluster PXE network')
+        utils.scan_ping_network('pxe')
+
+    def _scan_ipmi_network(self):
+        print('Scanning cluster IPMI network')
+        utils.scan_ping_network('ipmi')
+
     def launch(self):
         """Launch actions"""
 
@@ -532,6 +541,11 @@ class Gen(object):
         try:
             if self.args.post_deploy:
                 cmd = argparse_gen.Cmd.POST_DEPLOY.value
+        except AttributeError:
+            pass
+        try:
+            if self.args.util:
+                cmd = argparse_gen.Cmd.UTIL.value
         except AttributeError:
             pass
 
@@ -640,6 +654,11 @@ class Gen(object):
             if argparse_gen.is_arg_present(self.args.all):
                 self._config_data_switches()
 
+        if cmd == argparse_gen.Cmd.UTIL.value:
+            if self.args.scan_pxe_network:
+                self._scan_pxe_network()
+            if self.args.scan_ipmi_network:
+                self._scan_ipmi_network()
 
 def _run_playbook(playbook):
     log = logger.getlogger()
@@ -658,5 +677,8 @@ if __name__ == '__main__':
     logger.create(
         args.log_level_file[0],
         args.log_level_print[0])
+
+    if args.log_level_print[0] == 'debug':
+        print(args)
     GEN = Gen(args)
     GEN.launch()
