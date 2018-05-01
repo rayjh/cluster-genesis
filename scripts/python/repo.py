@@ -29,27 +29,43 @@ from subprocess import Popen, PIPE
 # from lib.genesis import GEN_PATH
 
 
-class local_repo(object):
+def _sub_proc_launch(cmd, stdout=PIPE, stderr=PIPE):
+    data = Popen(cmd.split(), stdout=PIPE, stderr=PIPE)
+    return data
 
-    def __init__(self, repo_name, arch='ppc64le', rhel_ver='7'):
-        self.repo_name = repo_name.lower()
+
+def _sub_proc_exec(cmd, stdout=PIPE, stderr=PIPE):
+    data = Popen(cmd.split(), stdout=PIPE, stderr=PIPE)
+    stdout, stderr = data.communicate()
+    return stdout, stderr
+
+def _sub_proc_wait(proc):
+    cnt = 0
+    rc = None
+    while rc is None:
+        rc = proc.poll()
+        print('\rwaiting for process to finish. Time elapsed: {:2}:{:2}:{:2}'.
+              format(cnt // 3600, cnt % 3600 // 60, cnt % 60), end="")
+        sys.stdout.flush()
+        time.sleep(1)
+        cnt += 1
+    print('\n')
+    resp, err = proc.communicate()
+    print(resp)
+    return rc
+
+class remote_nginx_repo(object):
+    def __init__(self, arch='ppc64le', rhel_ver='7'):
+        self.repo_name = 'nginx repo'
         self.arch = arch
         self.rhel_ver = str(rhel_ver)
         self.log = logger.getlogger()
 
-    def _sub_proc_launch(self, cmd, stdout=PIPE, stderr=PIPE):
-        data = Popen(cmd.split(), stdout=PIPE, stderr=PIPE)
-        return data
-
-    def _sub_proc_exec(self, cmd, stdout=PIPE, stderr=PIPE):
-        data = Popen(cmd.split(), stdout=PIPE, stderr=PIPE)
-        stdout, stderr = data.communicate()
-        return stdout, stderr
-
-    def create_local_link(self):
-        self.log.info('Registering local repo {} with yum.'.format(self.repo_name))
-
-        repo_link_path = '/etc/mum.repos.d/{}-local.repo'.format(self.repo_name)
+    def yum_create_remote(self):
+        """Create the /etc/yum.repos.d/
+        """
+        self.log.info('Registering remote repo {} with yum.'.format(self.repo_name))
+        repo_link_path = '/etc/yum.repos.d/nginx.repo'
         if os.path.isfile(repo_link_path):
             self.log.info('Remote linkage for repo {} already exists.'
                           .format(self.repo_name))
@@ -58,35 +74,78 @@ class local_repo(object):
         self.log.info('Creating remote repo link.')
         self.log.info(repo_link_path)
         with open(repo_link_path, 'w') as f:
+            f.write('[nginx]\n')
+            f.write('name={}\n'.format(self.repo_name))
+            f.write('baseurl=http://nginx.org/packages/mainline/rhel/{}/{}\n'.format(self.rhel_ver, self.arch))
+            f.write('gpgcheck=0\n')
+            f.write('enabled=1\n')
+
+
+class local_epel_repo(object):
+
+    def __init__(self, repo_name, arch='ppc64le', rhel_ver='7'):
+        self.repo_name = repo_name.lower()
+        self.arch = arch
+        self.rhel_ver = str(rhel_ver)
+        self.log = logger.getlogger()
+
+    def yum_create_local(self):
+        """Create the /etc/yum.repos.d/
+        """
+        self.log.info('Registering local repo {} with yum.'.format(self.repo_name))
+
+        repo_link_path = '/etc/yum.repos.d/{}-local.repo'.format(self.repo_name)
+        if os.path.isfile(repo_link_path):
+            self.log.info('Remote linkage for repo {} already exists.'
+                          .format(self.repo_name))
+            self.log.info(repo_link_path)
+
+        self.log.info('Creating local repo link.')
+        self.log.info(repo_link_path)
+        with open(repo_link_path, 'w') as f:
             f.write('[{}-local]\n'.format(self.repo_name))
             f.write('name={}_local_repo\n'.format(self.repo_name))
-            f.write('baseurl="file:///srv/repos/epel.staging/epel-{}/"\n'.format(self.arch))
+            f.write('baseurl="file:///srv/repos/epel/{}/epel-{}/"\n'.format(self.rhel_ver, self.arch))
             f.write('gpgcheck=0')
 
-    def sync_repo(self):
+    def sync(self):
         self.log.info('Syncing remote repository {}'.format(self.repo_name))
         self.log.info('This can take many minutes or hours for large repositories')
-        cmd = 'reposync -a {} -r {} -p /srv/repos/epel.staging -l -m'.format(self.arch, self.repo_name)
-        # resp, err = self._sub_proc_exec(cmd)
-        proc = self._sub_proc_launch(cmd)
+        cmd = 'reposync -a {} -r {} -p /srv/repos/epel/{} -l -m'.format(self.arch, self.repo_name, self.rhel_ver)
+        #print(cmd)
+        #cmd = 'sleep 5'
+        proc = _sub_proc_launch(cmd)
+        dat = proc.stdout.readline()
+        print(dat)
+        rc = _sub_proc_wait(proc)
         # code.interact(banner='sync_repo', local=dict(globals(), **locals()))
-        cnt = 1
-        rc = None
-        while rc is None:
-            rc = proc.poll()
-            print('\rwaiting for sync to finish. Time elapsed: min: {:3} sec: {:2}'.format(cnt // 60, cnt % 60), end="")
-            sys.stdout.flush()
-            time.sleep(1)
-            cnt += 1
-        print('\n')
-        resp, err = proc.communicate()
         if rc != 0:
             self.log.error(err)
         else:
-            self.log.info('Sync process finished succesfully')
-        print(resp)
+            self.log.info('Process finished succesfully')
 
-    def create_remote_link(self):
+    def create_dirs(self):
+        if not os.path.exists('/srv/repos/epel/{}'.format(self.rhel_ver)):
+            self.log.info('creating directory /srv/repos/epel/{}'.format(self.rhel_ver))
+            os.makedirs('/srv/repos/epel/{}'.format(self.rhel_ver))
+        else:
+            self.log.info('Directory /srv/repos/epel/{} already exists'.format(self.rhel_ver))
+
+    def create(self):
+        if not os.path.exists('/srv/repos/epel/{}/{}/repodata'.format(self.rhel_ver, self.repo_name)):
+            self.log.info('Creating repository metadata and databases')
+            cmd = 'createrepo -v -g comps.xml /srv/repos/epel/{}/{}'.format(self.rhel_ver, self.repo_name)
+            print(cmd)
+            proc = _sub_proc_launch(cmd)
+            rc = _sub_proc_wait(proc)
+            if rc != 0:
+                self.log.error('Repo creation error: {}'.format(err))
+            else:
+                self.log.info('Repo create process finished succesfully')
+        else:
+            self.log.info('Repo {} already created'.format(self.repo_name))
+
+    def yum_create_remote(self):
         self.log.info('Registering remote repo {} with yum.'.format(self.repo_name))
 
         repo_link_path = '/etc/mum.repos.d/{}.repo'.format(self.repo_name)
@@ -127,13 +186,11 @@ class local_repo(object):
 
 
 if __name__ == '__main__':
-    """ Configures or deconfigures data switches.
-    Args: optional log level or optional deconfig in any order
+    """ setup reposities. sudo env "PATH=$PATH" python repo.py
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument('repo_name', nargs='?',
-                        help='repository name',
-                        default='config.yml')
+    parser.add_argument('repo_name', nargs=1,
+                        help='repository name')
 
     parser.add_argument('--print', '-p', dest='log_lvl_print',
                         help='print log level', default='info')
@@ -142,10 +199,19 @@ if __name__ == '__main__':
                         help='file log level', default='info')
 
     args = parser.parse_args()
+    args.repo_name = args.repo_name[0]
+
+    if args.log_lvl_print == 'debug':
+        print(args)
 
     logger.create(args.log_lvl_print, args.log_lvl_file)
 
-    repo = local_repo(args.repo_name)
-    repo.create_remote_link()
-    repo.sync_repo()
-    repo.create_local_link()
+    nginx_repo = remote_nginx_repo()
+    nginx_repo.yum_create_remote()
+
+    repo = local_epel_repo(args.repo_name)
+    repo.yum_create_remote()
+    repo.create_dirs()
+    #repo.sync()
+    repo.create()
+    repo.yum_create_local()
