@@ -29,7 +29,7 @@ import enable_deployer_networks
 import enable_deployer_gateway
 import validate_cluster_hardware
 import configure_mgmt_switches
-import utils
+from lib.utilities import scan_ping_network
 import download_os_images
 import lxc_conf
 import lib.argparse_gen as argparse_gen
@@ -503,11 +503,11 @@ class Gen(object):
 
     def _scan_pxe_network(self):
         print('Scanning cluster PXE network')
-        utils.scan_ping_network('pxe')
+        scan_ping_network('pxe')
 
     def _scan_ipmi_network(self):
         print('Scanning cluster IPMI network')
-        utils.scan_ping_network('ipmi')
+        scan_ping_network('ipmi')
 
     def launch(self):
         """Launch actions"""
@@ -540,7 +540,7 @@ class Gen(object):
         except AttributeError:
             pass
         try:
-            if self.args.util:
+            if self.args.utils:
                 cmd = argparse_gen.Cmd.UTIL.value
         except AttributeError:
             pass
@@ -655,6 +655,7 @@ class Gen(object):
                 self._scan_pxe_network()
             if self.args.scan_ipmi_network:
                 self._scan_ipmi_network()
+
 
 def _run_playbook(playbook):
     log = logger.getlogger()

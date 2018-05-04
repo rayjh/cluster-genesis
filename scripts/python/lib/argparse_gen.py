@@ -24,7 +24,7 @@ SETUP_CMD = 'setup'
 CONFIG_CMD = 'config'
 VALIDATE_CMD = 'validate'
 DEPLOY_CMD = 'deploy'
-UTIL_CMD = 'util'
+UTIL_CMD = 'utils'
 POST_DEPLOY_CMD = 'post-deploy'
 SETUP_DESC = 'Setup deployment environment (requires root privileges)'
 CONFIG_DESC = 'Configure deployment environment'
@@ -120,7 +120,7 @@ def get_args(parser_args=False):
         parents=[common_parser],
         formatter_class=RawTextHelpFormatter)
 
-    parser_util = subparsers.add_parser(
+    parser_utils = subparsers.add_parser(
         UTIL_CMD,
         description='%s - %s' % (PROJECT, UTIL_DESC),
         help=UTIL_DESC,
@@ -301,22 +301,22 @@ def get_args(parser_args=False):
         metavar='CONTAINER-NAME',
         help='Run all cluster post deployment steps')
 
-    # 'util' subcommand arguments
-    parser_util.set_defaults(util=True)
+    # 'utils' subcommand arguments
+    parser_utils.set_defaults(utils=True)
 
-    parser_util.add_argument(
+    parser_utils.add_argument(
         '--scan-pxe-network',
         action='store_true',
         help='Ping all addresses in PXE subnet')
 
-    parser_util.add_argument(
+    parser_utils.add_argument(
         '--scan-ipmi-network',
         action='store_true',
         help='Ping all addresses in IPMI subnet')
 
     if parser_args:
         return (parser, parser_setup, parser_config, parser_validate,
-                parser_deploy, parser_post_deploy, parser_util)
+                parser_deploy, parser_post_deploy, parser_utils)
     return parser
 
 
@@ -371,8 +371,8 @@ def _check_post_deploy(args, subparser):
             '--config-client-os -a/--all is required')
 
 
-def _check_util(args, subparser):
-    if not args.scan-pxe-network and not args.scan-ipmi-network:
+def _check_utils(args, subparser):
+    if not args.scan_pxe_network and not args.scan_ipmi_network:
         subparser.error(
             'one of the arguments --scan-pxe-network --scan-ipmi-network is required')
 
@@ -387,7 +387,7 @@ def get_parsed_args():
     """Get parsed 'gen' command arguments"""
 
     parser, parser_setup, parser_config, parser_validate, parser_deploy, \
-        parser_post_deploy, parser_util = get_args(parser_args=True)
+        parser_post_deploy, parser_utils = get_args(parser_args=True)
     args = parser.parse_args()
 
     # Check arguments
@@ -417,8 +417,8 @@ def get_parsed_args():
     except AttributeError:
         pass
     try:
-        if args.software:
-            _check_util(args, parser_software)
+        if args.utils:
+            _check_utils(args, parser_utils)
     except AttributeError:
         pass
 
