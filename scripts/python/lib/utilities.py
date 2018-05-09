@@ -193,9 +193,8 @@ def sub_proc_wait(proc):
 
 
 def scan_ping_network(network_type='all', config_path=None):
-    cfg = Config()
+    cfg = Config(config_path)
     type_ = cfg.get_depl_netw_client_type()
-    # print(type_)
     if network_type == 'pxe' or network_type == 'all':
         net_type = 'pxe'
         idx = type_.index(net_type)
