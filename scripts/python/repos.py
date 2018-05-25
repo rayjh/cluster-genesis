@@ -27,7 +27,7 @@ import code
 
 import lib.logger as logger
 from lib.utilities import sub_proc_display, sub_proc_exec, heading1, rlinput, \
-    get_url, get_dir, get_yesno, get_selection, bold
+    get_url, get_dir, get_yesno, get_selection, get_file_path, bold
 from lib.exception import UserException
 
 
@@ -42,8 +42,10 @@ def setup_source_file(src_name, dest, name=None):
             /srv/
         name (str): Name for the source. Used only for display and prompts.
     Returns:
-        state (bool) : State is True/False to indicate that a file
-            matching the src_name exists or was copied to the dest directory.
+        state (bool) : state is True if a file matching the src_name exists
+            in the dest directory or was succesfully copied there. state is
+            False if there is no file matching src_name in the dest directory
+            OR if the attempt to copy a new file to the dest directory failed.
         src_path (str) : The path for the file found / chosen by the user. If
             only a single match is found it is used without choice and returned.
     """
@@ -59,10 +61,8 @@ def setup_source_file(src_name, dest, name=None):
         for item in g:
             print(item)
         print()
-        r = get_yesno(f'Do you wish to update the {name} source file', 'yes/n')
-    else:
-        r = 'yes'
-    if r == 'yes':
+
+    if get_yesno(f'Do you wish to update the {name} source file', 'yes/n'):
         print()
         log.info(f'Searching for {name} source file')
         # Search home directories first
@@ -74,8 +74,8 @@ def setup_source_file(src_name, dest, name=None):
             resp, err, rc = sub_proc_exec(cmd)
             if not resp:
                 print(f'{name} source file {src_name} not found')
-                r = get_yesno('Search again', 'y/no')
-                if r == 'no':
+
+                if not get_yesno('Search again', 'y/no', prompt='y'):
                     log.error(f'{name} source file {src_name} not found.\n {name} is not'
                               ' setup.')
                     return False, None
@@ -96,8 +96,10 @@ def setup_source_file(src_name, dest, name=None):
             log.info(f'Successfully installed {name} source file '
                      'into the POWER-Up software server.')
             return True, src_path
-    else:
+    elif g:
         return True, None
+    else:
+        return False, None
 
 
 class PowerupRepo(object):
@@ -178,6 +180,38 @@ class PowerupRepo(object):
             self.log.info('Repo create process finished succesfully')
 
 
+class PowerupRepoFromRpm(PowerupRepo):
+    """Sets up a yum repository for access by POWER-Up software clients.
+    The repo is created from an rpm file selected by the user.
+    """
+    def __init__(self, repo_id, repo_name, arch='ppc64le', rhel_ver='7'):
+        super(PowerupRepoFromRpm, self).__init__(repo_id, repo_name, arch, rhel_ver)
+
+    def get_rpm_path(self, filepath='/home/**/*.rpm'):
+        #code.interact(banner='here', local=dict(globals(), **locals()))
+        self.rpm_path = get_file_path(filepath)
+        return self.rpm_path
+
+    def copy_rpm(self):
+        dst_dir = f'/srv/{self.repo_id}'
+        if not os.path.exists(dst_dir):
+            os.mkdir(dst_dir)
+        copy2(self.rpm_path, dst_dir)
+
+    def extract_rpm(self):
+        extract_dir = os.path.join(self.repo_dir, self.repo_id)
+        if not os.path.exists(extract_dir):
+            os.makedirs(extract_dir)
+        os.chdir(extract_dir)
+        cmd = f'rpm2cpio {self.rpm_path} | sudo cpio -div'
+        resp, err, rc = sub_proc_exec(cmd, shell=True)
+        if rc != 0:
+            self.log.error(f'Failed extracting {self.rpm_path}')
+
+        repodata_path = glob.glob(f'{extract_dir}/**/repodata', recursive=True)
+        return os.path.dirname(repodata_path)
+
+
 class PowerupRepoFromRepo(PowerupRepo):
     """Sets up a yum repository for access by POWER-Up software clients.
     The repo is first sync'ed locally from the internet or a user specified
@@ -200,7 +234,7 @@ class PowerupRepoFromRepo(PowerupRepo):
             print(f'\nDo you want to create a local {self.repo_name} repository'
                   'at this time?\n')
             print('This can take a significant amount of time')
-            ch = get_yesno(prompt='Create Repo? ', yesno='Y/n')
+            ch = 'Y' if get_yesno(prompt='Create Repo? ', yesno='Y/n') else 'n'
         return ch, new
 
     def get_repo_url(self, url, alt_url=None):

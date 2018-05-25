@@ -30,7 +30,7 @@ import code
 
 import lib.logger as logger
 from repos import PowerupRepo, PowerupRepoFromDir, PowerupRepoFromRepo, \
-    setup_source_file
+    PowerupRepoFromRpm, setup_source_file
 from software_hosts import get_ansible_inventory
 from lib.utilities import sub_proc_display, sub_proc_exec, heading1, \
     get_selection, get_yesno, get_dir, get_file_path, rlinput
@@ -76,18 +76,23 @@ class software(object):
             yaml.dump(self.sw_vars, f, default_flow_style=False)
 
     def setup(self):
-        r = get_yesno('Would you like to create a custom repository? ')
-        if r == 'y':
-            ch, item = get_selection('Directory.RPM file', 'dir.rpm', '.',
-                                     'Custom repository from a directory or RPM file? ')
+        if get_yesno('Would you like to create a custom repository? ', default='n'):
             repo_id = input('Enter a repo id (yum short name): ')
             repo_name = input('Enter a repo name (Descriptive name): ')
+
+            ch, item = get_selection('Create from files in a directory.'
+                                     'Create from an RPM file', 'dir.rpm', '.',
+                                     'Custom repository from a directory or RPM file? ')
             if ch == 'rpm':
-                fpath = get_file_path('/home/**/*.rpm')
-                #print(fpath)
-                if fpath:
-                    if not os.path.exists(f'/srv/{repo_id}'):
-                        os.mkdir(f'/srv/{repo_id}')
+
+                repo = PowerupRepoFromRpm(repo_id, repo_name)
+
+                rpm_path = repo.get_rpm_path()
+                #code.interact(banner='rpm repo', local=dict(globals(), **locals()))
+                if rpm_path:
+                    repo.copy_rpm()
+                    repo.extract_rpm()
+
                 sys.exit('Leaving make repo from rpm')
             elif ch == 'dir':
                 repo = PowerupRepoFromDir(repo_id, repo_name)
@@ -248,15 +253,16 @@ class software(object):
                 ver = rlinput('Enter a version to use (x.y.z): ', '5.1.0')
             repo_id = f'DL-{ver}'
             repo_name = f'PowerAI-{ver}'
+
             repo = PowerupRepo(repo_id, repo_name)
+
             repo_path = repo.get_repo_dir()
             # First check if already installed
             if repo_installed:
                 print(f'\nRepository for {src_path} already exists')
                 print('in the POWER-Up software server.\n')
-                r = get_yesno('Do you wish to recreate the repository')
 
-            if not repo_installed or r == 'yes':
+            if not repo_installed or get_yesno('Do you wish to recreate the repository'):
                 cmd = f'rpm -ihv  --force --ignorearch {src_path}'
                 rc = sub_proc_display(cmd)
                 if rc != 0:
