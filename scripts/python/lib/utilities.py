@@ -28,7 +28,7 @@ import readline
 from shutil import copy2, Error
 from subprocess import Popen, PIPE
 from tabulate import tabulate
-# import code
+import code
 import lib.logger as logger
 
 PATTERN_MAC = '[\da-fA-F]{2}:){5}[\da-fA-F]{2}'
@@ -237,7 +237,7 @@ def rlinput(prompt, prefill=''):
         readline.set_startup_hook()
 
 
-def get_url(url='http://', prompt_name=''):
+def get_url(url='http://', prompt_name='', repo_chk=False):
     """Input a URL from user. The URL is checked for validity using curl
     and the user can continue modifying it indefinitely until a response
     is obtained or he can enter 'S' to skip (stop) entry.
@@ -248,7 +248,7 @@ def get_url(url='http://', prompt_name=''):
             return None
         url = url if url.endswith('/') else url + '/'
         try:
-            cmd = f'curl --max-time 2 -I {url}/'
+            cmd = f'curl --max-time 2 -I {url}'
             reply, err, rc = sub_proc_exec(cmd)
         except:
             pass
@@ -256,9 +256,19 @@ def get_url(url='http://', prompt_name=''):
             response = re.search(r'HTTP\/\d+.\d+\s+200\s+ok', reply, re.IGNORECASE)
             if response:
                 print(response.group(0))
-                r = get_yesno('Use the specified URL? ')
-                if r == 'yes':
-                    return url
+                if repo_chk:
+                    cmd = f'curl -G {url}'
+                    reply, err, rc = sub_proc_exec(cmd)
+                    repodata = re.search(r'href=["\']repodata\/["\']', reply)
+                    if repodata:
+                        print('Repository data found.')
+                        if get_yesno('Use the specified URL? '):
+                            return url
+                    else:
+                        print('Not a valid repository')
+                else:
+                    if get_yesno('Use the specified URL? '):
+                        return url
             else:
                 err = re.search('curl: .+', err)
                 if err:
@@ -334,8 +344,7 @@ def get_dir(src_dir):
             print(dirs)
 
             print(f'\nThe entered path was: {top}')
-            r = get_yesno('Use the entered path? ')
-            if r == 'yes':
+            if get_yesno('Use the entered path? '):
                 return path
 
 
@@ -388,7 +397,9 @@ def get_selection(items, choices=None, sep='\n', prompt='Enter a selection: '):
 
 
 def get_file_path(filename='/home'):
-    """Interactive search and selection of a file path
+    """Interactive search and selection of a file path.
+    Returns:
+        path to file or None
     """
     print(bold('\nFile search hints:'))
     print('/home/user1/abc.*         Search for abc.* under home/user1/')
@@ -398,12 +409,14 @@ def get_file_path(filename='/home'):
     print()
     maxl = 40
     while True:
-        filename = rlinput(bold("Enter a file name to search for ('L' to leave): "),
-                           filename)
+        print("Enter a file name to search for ('L' to leave without making a selction): ")
+        filename = rlinput(bold("File: "), filename)
+        print()
         if filename == 'L' or filename == "'L'":
             return None
         files = glob(filename, recursive=True)
         if files:
+            print(bold(f'Found {len(files)} matching'))
             if len(files) > maxl:
                 print(f'\nSearch returned more than {maxl} items. Showing first {maxl}')
                 files = files[:40]
