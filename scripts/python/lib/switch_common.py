@@ -27,7 +27,6 @@ from filelock import Timeout, FileLock
 from socket import gethostbyname
 
 import lib.logger as logger
-from lib.genesis import GEN_LOGS_PATH
 from lib.ssh import SSH
 from lib.switch_exception import SwitchException
 
@@ -99,7 +98,7 @@ class SwitchCommon(object):
             return
 
         host_ip = gethostbyname(self.host)
-        lock = FileLock(os.path.join(GEN_LOGS_PATH, host_ip + '.lock'))
+        lock = FileLock(os.path.join('/var/lock', host_ip + '.lock'))
         cnt = 0
         while cnt < 5 and not lock.is_locked:
             if cnt > 0:
