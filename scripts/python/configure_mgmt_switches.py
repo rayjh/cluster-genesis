@@ -130,7 +130,7 @@ def configure_mgmt_switches(config_file=None):
                 sw_vlans.append(int(port))
             avlans = ports_cfg[str(port)]['avlans'].split(', ')
             for avlan in avlans:
-                if int(avlan) not in sw_vlans:
+                if avlan and int(avlan) not in sw_vlans:
                     sw_vlans.append(int(avlan))
 
         vlan_mgmt = cfg.get_depl_netw_mgmt_vlan()
