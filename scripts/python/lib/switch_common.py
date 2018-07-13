@@ -17,7 +17,8 @@
 from __future__ import nested_scopes, generators, division, absolute_import, \
     with_statement, print_function, unicode_literals
 
-import os.path
+import os
+import stat
 import subprocess
 import re
 import netaddr
@@ -98,7 +99,11 @@ class SwitchCommon(object):
             return
 
         host_ip = gethostbyname(self.host)
-        lock = FileLock(os.path.join('/var/lock', host_ip + '.lock'))
+        lockfile = os.path.join('/var/lock', host_ip + '.lock')
+        if not os.path.isfile(lockfile):
+            os.mknod(lockfile)
+            os.chmod(lockfile, stat.S_IRWXO | stat.S_IRWXG | stat.S_IRWXU)
+        lock = FileLock(lockfile)
         cnt = 0
         while cnt < 5 and not lock.is_locked:
             if cnt > 0:
@@ -106,7 +111,7 @@ class SwitchCommon(object):
                               format(self.host))
             cnt += 1
             try:
-                lock.acquire(timeout=5) #  5 sec
+                lock.acquire(timeout=5)  # 5 sec
             except Timeout:
                 pass
         if lock.is_locked:
