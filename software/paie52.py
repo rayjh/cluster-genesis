@@ -83,8 +83,8 @@ class software(object):
                       'CUDA dnn content': '-',
                       'CUDA nccl2 content': '-',
                       'Anaconda content': '-',
-                      'Anaconda Repository Free': '-',
-                      'Anaconda Repository Main': '-',
+                      'Anaconda Free Repository': '-',
+                      'Anaconda Main Repository': '-',
                       'Spectrum conductor content': '-',
                       'Spectrum DLI content': '-',
                       'Nginx Web Server': '-',
@@ -162,21 +162,19 @@ class software(object):
                                                       'POWER-Up server')
 
             # Anaconda Repo Free status
-            if item == 'Anaconda Repository Free':
-                item_dir = get_name_dir(item)
-                repodata_noarch = glob.glob(f'/srv/repos/{item_dir}/pkgs/free'
+            if item == 'Anaconda Free Repository':
+                repodata_noarch = glob.glob(f'/srv/repos/anaconda/pkgs/free'
                                             '/noarch/repodata.json', recursive=True)
-                repodata = glob.glob(f'/srv/repos/{item_dir}/pkgs/free'
+                repodata = glob.glob(f'/srv/repos/anaconda/pkgs/free'
                                      '/linux-ppc64le/repodata.json', recursive=True)
                 if repodata and repodata_noarch:
                     self.state[item] = f'{item} is setup'
 
             # Anaconda Main repo status
-            if item == 'Anaconda Repository Main':
-                item_dir = get_name_dir(item)
-                repodata_noarch = glob.glob(f'/srv/repos/{item_dir}/pkgs/main'
+            if item == 'Anaconda Main Repository':
+                repodata_noarch = glob.glob(f'/srv/repos/anaconda/pkgs/main'
                                             '/noarch/repodata.json', recursive=True)
-                repodata = glob.glob(f'/srv/repos/{item_dir}/pkgs/main'
+                repodata = glob.glob(f'/srv/repos/anaconda/pkgs/main'
                                      '/linux-ppc64le/repodata.json', recursive=True)
                 if repodata and repodata_noarch:
                     self.state[item] = f'{item} is setup'
@@ -582,16 +580,18 @@ class software(object):
             self.sw_vars[f'{ana_name}_alt_url'] = src_path
 
         # Setup Anaconda Free Repo.  (not a YUM repo)
-        repo_id = 'anaconda-free'
-        repo_name = 'Anaconda Repository Free'
+        repo_id = 'anaconda'
+        repo_name = 'Anaconda Free Repository'
         baseurl = 'https://repo.continuum.io/pkgs/free/linux-ppc64le/'
         heading1(f'Set up {repo_name}\n')
-        if f'{repo_id}_alt_url' in self.sw_vars:
-            alt_url = self.sw_vars[f'{repo_id}_alt_url']
+
+        vars_key = get_name_dir(repo_name)  # format the name
+        if f'{vars_key}-alt-url' in self.sw_vars:
+            alt_url = self.sw_vars[f'{vars_key}-alt-url']
         else:
             alt_url = None
 
-        exists = self.status_prep(which='Anaconda Repository Free')
+        exists = self.status_prep(which='Anaconda Free Repository')
         if exists:
             self.log.info('The Anaconda Repository exists already'
                           ' in the POWER-Up server\n')
@@ -603,13 +603,14 @@ class software(object):
             # if not exists or ch == 'F':
             url = repo.get_repo_url(baseurl, alt_url)
             if not url == baseurl:
-                self.sw_vars[f'{repo_id}_alt_url'] = url
+                self.sw_vars[f'{vars_key}-alt-url'] = url
             dest_dir = repo.sync_ana(url)
             dest_dir = dest_dir[4 + dest_dir.find('/srv'):5 + dest_dir.find('free')]
             # form .condarc channel entry. Note that conda adds
             # the corresponding 'noarch' channel automatically.
             channel = f'  - http://{{ host_ip.stdout }}/{dest_dir}'
-            self.sw_vars['ana_powerup_repo_channels'].append(channel)
+            if channel not in self.sw_vars['ana_powerup_repo_channels']:
+                self.sw_vars['ana_powerup_repo_channels'].append(channel)
             noarch_url = os.path.split(url.rstrip('/'))[0] + '/noarch/'
             rejlist = ('continuum-docs-*,cudatoolkit-*,'
                        'cudnn-*,tensorflow-*,caffe-*,'
@@ -618,16 +619,18 @@ class software(object):
             repo.sync_ana(noarch_url, rejlist=rejlist)
 
         # Setup Anaconda Main Repo.  (not a YUM repo)
-        repo_id = 'anaconda-main'
-        repo_name = 'Anaconda Repository Main'
+        repo_id = 'anaconda'
+        repo_name = 'Anaconda Main Repository'
         baseurl = 'https://repo.continuum.io/pkgs/main/linux-ppc64le/'
         heading1(f'Set up {repo_name}\n')
-        if f'{repo_id}_alt_url' in self.sw_vars:
-            alt_url = self.sw_vars[f'{repo_id}_alt_url']
+
+        vars_key = get_name_dir(repo_name)  # format the name
+        if f'{vars_key}-alt-url' in self.sw_vars:
+            alt_url = self.sw_vars[f'{vars_key}-alt-url']
         else:
             alt_url = None
 
-        exists = self.status_prep(which='Anaconda Repository Main')
+        exists = self.status_prep(which='Anaconda Main Repository')
         if exists:
             self.log.info('The Anaconda Repository exists already'
                           ' in the POWER-Up server\n')
@@ -639,7 +642,7 @@ class software(object):
             # if not exists or ch == 'F':
             url = repo.get_repo_url(baseurl, alt_url)
             if not url == baseurl:
-                self.sw_vars[f'{repo_id}_alt_url'] = url
+                self.sw_vars[f'{vars_key}-alt-url'] = url
 
             acclist = 'scipy-1.1.0*,six-1.11.0*'
 
@@ -648,7 +651,8 @@ class software(object):
             # form .condarc channel entry. Note that conda adds
             # the corresponding 'noarch' channel automatically.
             channel = f'  - http://{{ host_ip.stdout }}/{dest_dir}'
-            self.sw_vars['ana_powerup_repo_channels'].append(channel)
+            if channel not in self.sw_vars['ana_powerup_repo_channels']:
+                self.sw_vars['ana_powerup_repo_channels'].append(channel)
             noarch_url = os.path.split(url.rstrip('/'))[0] + '/noarch/'
             repo.sync_ana(noarch_url)
 

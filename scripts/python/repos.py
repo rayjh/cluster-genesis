@@ -414,9 +414,6 @@ class PowerupAnaRepoFromRepo(PowerupRepo):
 
             # remove directory path components up to '/pkgs'
             cd_cnt = url[3 + url.find('://'):url.find('/pkgs')].count('/')
-#            rejlist = ('continuum-docs-*,cudatoolkit-*,'
-#                       'cudnn-*,tensorflow-*,caffe-*,'
-#                       'anaconda-oss-docs-*,anaconda-docs-*')
 
             if acclist:
                 ctrl = '--accept'
