@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-sudo yum install python36
+sudo yum -y install python36
 set -e
 sudo python36 -m ensurepip --default-pip
 source /etc/os-release
