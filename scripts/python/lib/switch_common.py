@@ -132,7 +132,8 @@ class SwitchCommon(object):
             lock.release()
             # sleep 60 ms to give other processes a chance.
             sleep(0.06 + random() / 100)  # lock acquire polls at 50 ms
-            print('lock is locked?: {}'.format(lock.is_locked))
+            if lock.is_locked:
+                self.log.error('Lock is locked. Should be unlocked')
             return data
         else:
             self.log.error('Unable to acquire lock for switch {}'.format(self.host))
