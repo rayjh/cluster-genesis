@@ -32,11 +32,11 @@ from lib.exception import UserException
 
 def setup_source_file(name, src_glob, url='', alt_url='http://',
                       dest_dir=None, src2=None):
-    """Interactive selection of a source file and copy it to the /srv/<dest>
+    """Interactive selection of a source file and copy it to the /srv/<dest_dir>
     directory. The source file can include file globs and can come from a URL
-    or the local disk. Local disk searching starts in the
-    /home directory and then expands to the entire file system if no matches
-    found in any home directory. URLs must point to the directory with the file
+    or the local disk. Local disk searching starts in the /home and /root
+    directory and then expands to the entire file system if no matches
+    found in those directories. URLs must point to the directory with the file
     or a parent directory.
     Inputs:
         src_glob (str): Source file name to look for. Can include file globs
@@ -58,7 +58,6 @@ def setup_source_file(name, src_glob, url='', alt_url='http://',
             only a single match is found it is used without choice and returned.
         dest_path (str)
     """
-    state = False
     src_path = None
     dest_path = None
     log = logger.getlogger()
@@ -66,76 +65,82 @@ def setup_source_file(name, src_glob, url='', alt_url='http://',
     exists = glob.glob(f'/srv/{name_src}/**/{src_glob}', recursive=True)
     if exists:
         dest_path = exists[0]
-        state = True
-    ch, item = get_selection('Copy from URL\nSearch local Disk', 'U\nD', allow_none=True)
-    if ch == 'U':
-        if url:
-            ch, item = get_selection('Public mirror.Alternate web site', 'P.A',
-                                     'Select source: ', '.')
-        if ch == 'P':
-            _url = url
-        else:
+    copied = False
+    ch = ''
+    while not copied:
+        ch, item = get_selection('Copy from URL\nSearch local Disk', 'U\nD',
+                                 allow_none=True)
+
+        if ch == 'U':
             _url = alt_url if alt_url else 'http://'
-        rc = -9
-        while _url is not None and rc != 0:
-            _url = get_url(_url, fileglob=src_glob)
-            if _url:
+            if url:
+                ch1, item = get_selection('Public web site.Alternate web site', 'P.A',
+                                          'Select source: ', '.')
+                if ch1 == 'P':
+                    _url = url
+            rc = -9
+            while _url is not None and rc != 0:
+                _url = get_url(_url, fileglob=src_glob)
+                if _url:
+                    dest_dir = f'/srv/{name_src}'
+                    if not os.path.exists(dest_dir):
+                        os.mkdir(dest_dir)
+                    cmd = f'wget -r -l 1 -nH -np --cut-dirs=1 -P {dest_dir} {_url}'
+                    rc = sub_proc_display(cmd)
+                    if rc != 0:
+                        log.error(f'Failed downloading {name} source to'
+                                  f' /srv/{name_src}/ directory. \n{rc}')
+                        copied = False
+                    else:
+                        src_path = _url
+                        dest_path = os.path.join(dest_dir, os.path.basename(_url))
+                        copied = True
+                    if src2:
+                        _url2 = os.path.join(os.path.dirname(_url), src2)
+                        cmd = f'wget -r -l 1 -nH -np --cut-dirs=1 -P {dest_dir} {_url2}'
+                        rc = sub_proc_display(cmd)
+                        if rc != 0:
+                            log.error(f'Failed downloading {name} source file {src2} to'
+                                      f' /srv/{name_src}/ directory. \n{rc}')
+                            copied = False
+                        else:
+                            src_path = _url
+                            copied = copied and True
+        elif ch == 'D':
+            src_path = get_src_path(src_glob)
+            if src_path:
                 dest_dir = f'/srv/{name_src}'
                 if not os.path.exists(dest_dir):
                     os.mkdir(dest_dir)
-                cmd = f'wget -r -l 1 -nH -np --cut-dirs=1 -P {dest_dir} {_url}'
-                rc = sub_proc_display(cmd)
-                if rc != 0:
-                    log.error(f'Failed downloading {name} source to'
-                              f' /srv/{name_src}/ directory. \n{rc}')
-                else:
-                    src_path = _url
-                    dest_path = os.path.join(dest_dir, os.path.basename(_url))
-                    state = True
-                if src2:
-                    _url2 = os.path.join(os.path.dirname(_url), src2)
-                    cmd = f'wget -r -l 1 -nH -np --cut-dirs=1 -P {dest_dir} {_url2}'
-                    rc = sub_proc_display(cmd)
-                    if rc != 0:
-                        log.error(f'Failed downloading {name} source file {src2} to'
-                                  f' /srv/{name_src}/ directory. \n{rc}')
-                        state = False
-                    else:
-                        src_path = _url
-                        state = state and True
-    elif ch == 'D':
-        src_path = get_src_path(src_glob)
-        if src_path:
-            dest_dir = f'/srv/{name_src}'
-            if not os.path.exists(dest_dir):
-                os.mkdir(dest_dir)
-            try:
-                copy2(src_path, dest_dir)
-            except Error as err:
-                log.debug(f'Failed copying {name} source file to /srv/{name_src}/ '
-                          f'directory. \n{err}')
-            else:
-                log.info(f'Successfully installed {name} source file '
-                         'into the POWER-Up software server.')
-                dest_path = os.path.join(dest_dir, os.path.basename(src_path))
-                state = True
-            if src2:
                 try:
-                    src2_path = os.path.join(os.path.dirname(src_path), src2)
-                    copy2(src2_path, dest_dir)
+                    copy2(src_path, dest_dir)
                 except Error as err:
                     log.debug(f'Failed copying {name} source file to /srv/{name_src}/ '
                               f'directory. \n{err}')
-                    state = False
+                    copied = False
                 else:
-                    log.info(f'Successfully installed {name} source file {src2} '
+                    log.info(f'Successfully installed {name} source file '
                              'into the POWER-Up software server.')
-                    state = state and True
-    else:
-        log.info(f'No {name.capitalize()} source file copied to POWER-Up '
-                 'server directory')
+                    dest_path = os.path.join(dest_dir, os.path.basename(src_path))
+                    copied = True
+                if src2:
+                    try:
+                        src2_path = os.path.join(os.path.dirname(src_path), src2)
+                        copy2(src2_path, dest_dir)
+                    except Error as err:
+                        log.debug(f'Failed copying {name} source file to /srv/{name_src}/ '
+                                  f'directory. \n{err}')
+                        copied = False
+                    else:
+                        log.info(f'Successfully installed {name} source file {src2} '
+                                 'into the POWER-Up software server.')
+                        copied = copied and True
+        elif ch == 'N':
+            log.info(f'No {name.capitalize()} source file copied to POWER-Up '
+                     'server directory')
+            break
 
-    return src_path, dest_path, state
+    return src_path, dest_path, copied
 
 
 def get_name_dir(name):
@@ -563,25 +568,23 @@ class PowerupPypiRepoFromRepo(PowerupRepo):
         pkg_list2 = pkg_list.split()
         if alt_url:
             host = re.search(r'http://([^/]+)', alt_url).group(1)
-            for pkg in pkg_list2:
-                print(pkg)
-                cmd = (f'python2.7 -m pip download --platform ppc64le --no-deps '
-                       f'--index-url={alt_url} -d {self.pypirepo_dir} {pkg} '
-                       f'--trusted-host {host}')
-                resp, err, rc = sub_proc_exec(cmd, shell=True)
-                if rc != 0:
-                    self.log.error('Error occured while downloading python package: '
-                                   f'{pkg_list}. \nResp: {resp} \nRet code: {rc} '
-                                   f'\nerr: {err}')
+            # wait on 'f' string formatting since 'pkg' is not available yet
+            cmd = ("f'python -m pip download --python-version 27 "
+                   "--platform ppc64le --no-deps --index-url={alt_url} "
+                   "-d {self.pypirepo_dir} {pkg} --trusted-host {host}'")
         else:
-            for pkg in pkg_list2:
-                print(pkg)
-                cmd = (f'python2.7 -m pip download --platform ppc64le  --no-deps '
-                       f'-d {self.pypirepo_dir} {pkg}')
-                resp, err, rc = sub_proc_exec(cmd, shell=True)
-                if rc != 0:
+            cmd = ("f'python -m pip download --python-version 27 "
+                   "--platform ppc64le --no-deps -d {self.pypirepo_dir} {pkg}'")
+        for pkg in pkg_list2:
+            print(pkg)
+            resp, err, rc = sub_proc_exec(eval(cmd), shell=True)
+            if rc != 0:
+                if 'functools32' in resp and 'for Python 2.7 only' in resp:
+                    pass
+                else:
                     self.log.error('Error occured while downloading python packages: '
                                    f'\nResp: {resp} \nRet code: {rc} \nerr: {err}')
+
         if not os.path.isdir(self.pypirepo_dir + '/simple'):
             os.mkdir(self.pypirepo_dir + '/simple')
         dir_list = os.listdir(self.pypirepo_dir)
