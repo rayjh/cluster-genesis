@@ -1612,12 +1612,12 @@ class Config(object):
             for member in self.cfg.node_templates:
                 if hasattr(member, 'ipmi'):
                     list_.append(member.ipmi.userid)
-                elif hasattr(member, 'bmc'):
+                elif hasattr(member, 'openbmc'):
                     list_.append(member.bmc.userid)
             return list_
         if hasattr(self.cfg.node_templates[index], 'ipmi'):
             return self.cfg.node_templates[index].ipmi.userid
-        elif hasattr(self.cfg.node_templates[index], 'bmc'):
+        elif hasattr(self.cfg.node_templates[index], 'openbmc'):
             return self.cfg.node_templates[index].bmc.userid
 
     def yield_ntmpl_ipmi_userid(self):
@@ -1642,12 +1642,12 @@ class Config(object):
             for member in self.cfg.node_templates:
                 if hasattr(member, 'ipmi'):
                     list_.append(member.ipmi.password)
-                elif hasattr(member, 'bmc'):
+                elif hasattr(member, 'openbmc'):
                     list_.append(member.bmc.password)
             return list_
         if hasattr(self.cfg.node_templates[index], 'ipmi'):
             return self.cfg.node_templates[index].ipmi.password
-        elif hasattr(self.cfg.node_templates[index], 'bmc'):
+        elif hasattr(self.cfg.node_templates[index], 'openbmc'):
             return self.cfg.node_templates[index].bmc.password
 
     def yield_ntmpl_ipmi_password(self):
