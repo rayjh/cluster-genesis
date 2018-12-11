@@ -27,7 +27,7 @@ from lib.config import Config
 from lib.inventory import Inventory
 import lib.genesis as gen
 import lib.utilities as util
-from ipmi_set_power import ipmi_set_power
+from set_power_clients import set_power_clients
 from lib.exception import UserException
 import lib.logger as logger
 
@@ -95,7 +95,7 @@ def inv_set_ipmi_pxe_ip(config_path):
     nodes_list = []
 
     # All nodes should be powered off before starting
-    ipmi_set_power('off', config_path, wait=POWER_WAIT)
+    set_power_clients('off', config_path, wait=POWER_WAIT)
 
     # Create IPManager object for IPMI and/or PXE networks
     start_offset = gen.get_dhcp_pool_start()

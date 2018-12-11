@@ -26,6 +26,7 @@ from netaddr import IPNetwork
 from pyghmi.exceptions import IpmiException
 from orderedattrdict import AttrDict
 from tabulate import tabulate
+import code
 
 import lib.logger as logger
 from lib.config import Config
@@ -36,12 +37,11 @@ from lib.switch import SwitchFactory
 from lib.exception import UserException, UserCriticalException
 from get_dhcp_lease_info import GetDhcpLeases
 from lib.genesis import get_dhcp_pool_start, GEN_PATH
-from lib.utilities import sub_proc_exec, sub_proc_launch, bmc_ipmi_login,\
-    bmc_ipmi_logout
+from lib.utilities import sub_proc_exec, sub_proc_launch
+import lib.bmc as _bmc
 
 # offset relative to bridge address
 NAME_SPACE_OFFSET_ADDR = 1
-
 
 def main(config_path):
     """Validate config"""
@@ -257,7 +257,8 @@ class ValidateClusterHardware(object):
     def _verify_ipmi(self, node_addr_list, cred_list):
         """ Attempts to discover ipmi credentials and generate a list of all
         discovered nodes.  For each node try all available credentials.  If no
-        credentials allow access, the node is not marked as succesful.
+        credentials allow access, the node is not marked as succesful. Nodes
+        which communicate are powered off.
         Args:
             node_addr_list (list): list of ipv4 addresses for the discovered
             nodes. (ie those that previously fetched an address from the DHCP
@@ -276,37 +277,29 @@ class ValidateClusterHardware(object):
             # correct credentials with minimum attempts
             cred_list.sort(key=lambda x: x[2], reverse=True)
             for j, creds in enumerate(cred_list):
-                try:
-                    bmc = bmc_ipmi_login(node, creds[0], creds[1])
-                except IpmiException as exc:
-                    if str(exc) is not None:
-                        if 'Incorrect password' in str(exc) or \
-                                'Unauthorized name' in str(exc):
-                            pass
+                bmc = _bmc.Bmc(node, creds[0], creds[1])
+                if bmc.is_connected():
+                    r = bmc.chassis_power('status')
+                    if r:
+                        self.log.debug(f'Node {node} is powered {r}')
+                        self.ipmi_list_ai[node] = cred_list[j][:-1]
+                        cred_list[j][2] -= 1
+                        left -= left
+                        print(f'\r{tot - left} of {tot} nodes communicating via IPMI',
+                              end='')
+                        sys.stdout.flush()
+                        if bmc.chassis_power('off'):
+                            self.log.debug('Powered off node {node}')
+                        else:
+                            self.log.debug('Failed to power off node {node}')
+                        bmc.logout()
+                        break
                     else:
-                        self.log.error(str(exc))
-                else:
-                    self.log.debug(
-                        node + ' power is ' + bmc.get_power()['powerstate'])
-                    # reduce the number of nodes left to talk to with these
-                    # credentials
-                    self.ipmi_list_ai[node] = cred_list[j][:-1]
-                    cred_list[j][2] -= 1
-                    left -= left
-                    print('\r{} of {} nodes communicating via IPMI'
-                          .format(tot - left, tot), end="")
-                    sys.stdout.flush()
-                    try:
-                        bmc.set_power('off')
-                    except IpmiException as exc:
-                        self.log.error('Failed attempting reset on {}. {}'
-                                       .format(node, exc))
-                    bmc_ipmi_logout(bmc)
-                    break
+                        self.log.debug(f'No power status response from node {node}')
         if left != 0:
-            self.log.error('IPMI communication succesful with only {} of {} '
-                           'nodes'.format(tot - left, tot))
-        print()
+            self.log.error('IPMI communication successful with only {tot - left} '
+                           'of {tot} nodes')
+        print('\n')
 
     def _get_ipmi_ports(self, switch_lbl):
         """ Get all of the ipmi ports for a given switch
@@ -455,27 +448,15 @@ class ValidateClusterHardware(object):
             the userid, password and number of nodes for a node template.
         """
         for node in node_addr_list:
-            reset = False
+            #reset = False
             for j, creds in enumerate(cred_list):
-                try:
-                    bmc = bmc_ipmi_login(node, creds[0], creds[1])
-                except IpmiException as exc:
-                    if str(exc) is not None:
-                        if 'Incorrect password' in str(exc) or \
-                                'Unauthorized name' in str(exc):
-                            pass
+                bmc = _bmc.Bmc(node, creds[0], creds[1], 'ipmi')
+                if bmc.is_connected():
+                    self.log.info(f'Resetting BMC with existing ip address: {node}')
+                    if bmc.bmc_reset('cold'):
+                        bmc.logout()
                     else:
-                        self.log.error(str(exc))
-                else:
-                    try:
-                        bmc.reset_bmc()
-                    except IpmiException as exc:
-                        self.log.error('Failed attempting reset on {}'.format(node))
-                    reset = True
-                    bmc_ipmi_logout(bmc)
-                    break
-            if not reset:
-                self.log.warning('Unable to reset BMC: {}'.format(node))
+                        self.log.error(f'Failed attempting BMC reset on {node}')
 
     def validate_ipmi(self):
         self.log.info("Discover and validate cluster nodes")
@@ -485,11 +466,11 @@ class ValidateClusterHardware(object):
         #           "running IPMI hardware validation.")
         #     print("Type 'C' to validate cluster nodes defined in current "
         #           "'config.yml'")
-        #     resp = input("Type 'T' to terminate Cluster Genesis ")
+        #     resp = input("Type 'T' to terminate Power-Up ")
         #     if resp == 'T':
         #         resp = input("Type 'y' to confirm ")
         #         if resp == 'y':
-        #             self.log.info("'{}' entered. Terminating Genesis at user "
+        #             self.log.info("'{}' entered. Terminating Power-Up at user "
         #                           "request".format(resp))
         #             sys.exit(1)
         #     elif resp == 'C':
@@ -584,11 +565,11 @@ class ValidateClusterHardware(object):
                 break
             print('\n\nPress Enter to continue scanning for cluster nodes.\nOr')
             print("Or enter 'C' to continue cluster deployment with a subset of nodes")
-            resp = input("Or Enter 'T' to terminate Cluster Genesis ")
+            resp = input("Or Enter 'T' to terminate Power-Up ")
             if resp == 'T':
                 resp = input("Enter 'y' to confirm ")
                 if resp == 'y':
-                    self.log.info("'{}' entered. Terminating Genesis at user request"
+                    self.log.info("'{}' entered. Terminating Power-Up at user request"
                                   .format(resp))
                     self._teardown_ns(self.ipmi_ns)
                     sys.exit(1)
@@ -604,9 +585,10 @@ class ValidateClusterHardware(object):
             self.log.warning('Failed to validate expected number of nodes')
 
         if len(node_list) > 0 and len(cred_list) > 0:
+            # Verify and power off nodes
             self._verify_ipmi(node_list, cred_list)
 
-        self.log.info('Cycling power to all cluster nodes. Pausing 1 minute')
+        self.log.info('\nCycling power to all cluster nodes. Pausing 1 minute')
 
         t1 = time.time()
         self._power_all(self.ipmi_list_ai, 'off')
@@ -698,11 +680,11 @@ class ValidateClusterHardware(object):
         #           "running PXE hardware validation.")
         #     print("Type 'C' to validate cluster nodes defined in current "
         #           "'config.yml'")
-        #     resp = input("Type 'T' to terminate Cluster Genesis ")
+        #     resp = input("Type 'T' to terminate Power-Up ")
         #     if resp == 'T':
         #         resp = input("Type 'y' to confirm ")
         #         if resp == 'y':
-        #             self.log.info("'{}' entered. Terminating Genesis at user "
+        #             self.log.info("'{}' entered. Terminating Power-Up at user "
         #                           "request".format(resp))
         #             sys.exit(1)
         #     elif resp == 'C':
@@ -820,11 +802,11 @@ class ValidateClusterHardware(object):
             print('\n\nPress Enter to continue scanning for cluster nodes.')
             print("Or enter 'C' to continue cluster deployment with a subset of nodes")
             print("Or enter 'R' to cycle power to missing nodes")
-            resp = input("Or enter 'T' to terminate Cluster Genesis ")
+            resp = input("Or enter 'T' to terminate Power-Up ")
             if resp == 'T':
                 resp = input("Enter 'y' to confirm ")
                 if resp == 'y':
-                    self.log.info("'{}' entered. Terminating Genesis at user"
+                    self.log.info("'{}' entered. Terminating Power-Up at user"
                                   " request".format(resp))
                     self._teardown_ns(self.ipmi_ns)
                     self._teardown_ns(pxe_ns)
@@ -836,7 +818,7 @@ class ValidateClusterHardware(object):
                 resp = input("Enter 'y' to confirm continuation of"
                              " deployment without all nodes ")
                 if resp == 'y':
-                    self.log.info("'{}' entered. Continuing Genesis".format(resp))
+                    self.log.info("'{}' entered. Continuing Power-Up".format(resp))
                     break
         if cnt < pxe_cnt:
             self.log.warning('Failed to validate expected number of nodes')
@@ -925,7 +907,7 @@ class ValidateClusterHardware(object):
             bmc_ipmi_logout(bmc)
 
     def _power_all(self, ipmi_list_ai, state, bootdev=None, persist=False):
-        """Power on or off all nodes in node_list
+        """Set bootdev and Power on or off all nodes in node_list
         Args:
             ipmi_list_ai (list of dict{(ipv4),[list of userid, password]}):
             state (str): 'on' or 'off'
@@ -934,83 +916,55 @@ class ValidateClusterHardware(object):
         if bootdev:
             t1 = time.time()
             for node in sorted(ipmi_list_ai):
-                try:
-                    bmc = bmc_ipmi_login(node,
-                                         self.ipmi_list_ai[node][0],
-                                         self.ipmi_list_ai[node][1])
-                except IpmiException as exc:
-                    self.log.error('Failed login attempting set bootdev ' +
-                                   str(exc))
-                else:
-                    try:
-                        rc = bmc.set_bootdev(bootdev, persist)
-                        self.log.debug('Node boot device set to {}'.format(bootdev))
-                    except IpmiException as exc:
-                        self.log.error('Failed attempting set boot device. {}'
-                                       .format(str(exc)))
+                bmc = _bmc.Bmc(node, self.ipmi_list_ai[node][0],
+                                 self.ipmi_list_ai[node][1])
+                if bmc.is_connected():
+                    if bmc.host_boot_source(bootdev):
+                        self.log.debug(f'Node boot device set to {bootdev}')
                     else:
-                        try:
-                            rc = bmc.get_bootdev()
-                        except IpmiException as exc:
-                            self.log.error('Failed attempting get boot device. {}'
-                                           .format(str(exc)))
-                        else:
-                            if 'error' in rc or rc['bootdev'] != bootdev:
-                                self.log.error('Failed attempting get boot device on {}'
-                                               .format(node))
-                            else:
-                                self.log.debug('Get boot successful on {}: \n{}'.
-                                               format(node, rc))
-                    bmc_ipmi_logout(bmc)
+                        self.log.debug(f'Failed setting bootdev to {bootdev} '
+                                       f'on node {node}')
+                    bmc.logout()
+                else:
+                    self.log.error('Failed login to BMC {node}')
 
-            while time.time() < t1 + 1:
-                time.sleep(0.5)
+
+#            while time.time() < t1 + 1:
+            time.sleep(1)
 
         for node in sorted(ipmi_list_ai):
-            try:
-                bmc = bmc_ipmi_login(node,
-                                     self.ipmi_list_ai[node][0],
-                                     self.ipmi_list_ai[node][1])
-            except IpmiException as exc:
-                self.log.error(str(exc))
-                break
-
-            try:
-                rc = bmc.set_power(state)
-                self.log.debug('Node {} power state: {}'.format(node, rc))
-            except IpmiException as exc:
-                self.log.error('Failed attempting power {} of {}'.format(state, node))
-
-            bmc_ipmi_logout(bmc)
-
-        for node in sorted(ipmi_list_ai):
-            try:
-                bmc = bmc_ipmi_login(node,
-                                     self.ipmi_list_ai[node][0],
-                                     self.ipmi_list_ai[node][1])
-            except IpmiException as exc:
-                self.log.error(str(exc))
-                break
-
-            success = False
-            for i in range(4):
-                try:
-                    rc = bmc.get_power()
-                    self.log.debug('Power status: {}'.format(rc))
-                    if 'powerstate' in rc.keys():
-                        if rc['powerstate'] == state:
-                            success = True
+            for attempt in range(4):
+                bmc = _bmc.Bmc(node, self.ipmi_list_ai[node][0],
+                                 self.ipmi_list_ai[node][1])
+                if bmc.is_connected():
+                    if bmc.chassis_power(state):
+                        self.log.debug('Node {node} powered {state}')
+                        if bmc.logout():
+                            self.log.debug('Node {node} logged out of BMC')
                             break
-                    time.sleep(1)
-                except IpmiException as exc:
-                    self.log.debug('Power status: {}'.format(exc))
-            if not success:
-                self.log.error('Failed setting power state to {} for node {}'
-                               .format(state, node))
-            bmc_ipmi_logout(bmc)
+                        else:
+                            self.log.debug('Node {node} failed log out of BMC')
+                    else:
+                        self.log.debug('Node {node} failed to power {state}')
+                time.sleep(1)
+
+        for node in sorted(ipmi_list_ai):
+            for i in range(4):
+                bmc = _bmc.Bmc(node, self.ipmi_list_ai[node][0],
+                                 self.ipmi_list_ai[node][1])
+                if bmc.is_connected():
+                    if bmc.chassis_power('status') == 'state':
+                        self.log.debug(f'Chassis power state set for node {node}')
+                        if bmc.logout():
+                            self.log.debug('Node {node} logged out of BMC')
+                            break
+                        else:
+                            self.log.debug('Node {node} failed log out of BMC')
+                    else:
+                        self.log.debug(f'Chassis power state not set for node {node}')
 
     def _get_network(self, type_):
-        """Returns details of a Genesis network.
+        """Returns details of a Power-Up network.
         Args:
             type_ (str): Either 'pxe' or 'ipmi'
         Returns:
