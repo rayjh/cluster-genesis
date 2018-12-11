@@ -61,33 +61,31 @@ class Bmc(object):
         return self.host
 
     def logout(self):
-        if self.bmc_type == 'open':
+        if self.bmc_type == 'openbmc':
             return open_bmc.logout(self.host, self.user, self.pw, self.bmc)
         elif self.bmc_type == 'ipmi':
             return ipmi.logout(self.host, self.user, self.pw, self.bmc)
 
     def chassis_power(self, op, timeout=5):
-        if self.bmc_type == 'open':
+        if self.bmc_type == 'openbmc':
             return open_bmc.chassisPower(self.host, op, self.bmc)
         if self.bmc_type == 'ipmi':
             return ipmi.chassisPower(self.host, op, self.bmc)
-        elif self.bmc_type == 'ipmi':
-            pass
 
     def host_boot_source(self, source='', timeout=5):
-        if self.bmc_type == 'open':
+        if self.bmc_type == 'openbmc':
             return open_bmc.hostBootSource(self.host, source, self.bmc)
         elif self.bmc_type == 'ipmi':
             return ipmi.hostBootSource(self.host, source, self.bmc)
 
     def host_boot_mode(self, mode='', timeout=5):
-        if self.bmc_type == 'open':
+        if self.bmc_type == 'openbmc':
             return open_bmc.hostBootMode(self.host, mode, self.bmc)
         elif self.bmc_type == 'ipmi':
             return ipmi.hostBootMode(self.host, mode, self.bmc)
 
     def bmc_reset(self, op):
-        if self.bmc_type == 'open':
+        if self.bmc_type == 'openbmc':
             return open_bmc.bmcReset(self.host, op, self.bmc)
         elif self.bmc_type == 'ipmi':
             return ipmi.bmcReset(self.host, op, self.bmc)
