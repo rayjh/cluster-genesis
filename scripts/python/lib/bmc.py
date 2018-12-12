@@ -90,6 +90,11 @@ class Bmc(object):
         elif self.bmc_type == 'ipmi':
             return ipmi.bmcReset(self.host, op, self.bmc)
 
+    def bmc_status(self, timeout=5):
+        if self.bmc_type == 'openbmc':
+            return open_bmc.bmcPowerState(self.host, self.bmc, timeout)
+        elif self.bmc_type == 'ipmi':
+            return 'Ready'
 
 if __name__ == '__main__':
     """Show status of the Cluster Genesis environment
@@ -145,18 +150,20 @@ if __name__ == '__main__':
     if bmc.is_connected():
         print(f'logged into BMC {bmc}')
         if args.bmc_type in ('open', 'ipmi'):
-            print('Rebooting bmc')
-            r = bmc.bmc_reset('cold')
-            print(f'BMC response: {r}')
-            if not r:
-                log.error(f'Failed reboot of bmc {args.host}.')
-            else:
-                print('Attempting BMC logout...')
-                if bmc.logout():
-                    print(f'Logged out of BMC {args.host}')
-                else:
-                    log.debug(f'Failed to log out of BMC {args.host}')
-                    del bmc
+            bmc_status = bmc.bmc_status()
+            print(f'BMC status: {bmc_status}')
+            #print('Rebooting bmc')
+            #r = bmc.bmc_reset('cold')
+            #print(f'BMC response: {r}')
+            #if not r:
+            #    log.error(f'Failed reboot of bmc {args.host}.')
+            #else:
+            #    print('Attempting BMC logout...')
+            #    if bmc.logout():
+            #        print(f'Logged out of BMC {args.host}')
+            #    else:
+            #        log.debug(f'Failed to log out of BMC {args.host}')
+            #        del bmc
 
             # print('Setting host boot mode')
             # r = bmc.host_boot_mode('regular')

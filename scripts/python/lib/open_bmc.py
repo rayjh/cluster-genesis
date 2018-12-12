@@ -18,6 +18,7 @@
 import requests
 import json
 from enum import Enum
+import code
 
 import lib.logger as logger
 
@@ -40,21 +41,21 @@ def login(host, username, pw, timeout=10):
         r = mysess.post(f'https://{host}/login', headers=httpHeader,
                         json={"data": [username, pw]}, verify=False, timeout=timeout)
     except(requests.exceptions.Timeout) as err:
-        log.error(f'BMC login session request timout error {err}')
+        log.debug(f'BMC login session request timout error {err}')
         mysess = None
     except(requests.exceptions.ConnectionError) as err:
-        log.error(f'BMC login session request connect error {err}')
+        log.debug(f'BMC login session request connect error {err}')
         mysess = None
     else:
         try:
             loginMessage = json.loads(r.text)
         except json.JSONDecodeError as exc:
-            log.error(f'Error decoding JSON response from BMC {host}')
+            log.debug(f'Error decoding JSON response from BMC {host}')
             log.debug(exc)
             mysess = None
         else:
             if (loginMessage['status'] != "ok"):
-                log.error(loginMessage["data"]["description"].encode('utf-8'))
+                log.debug(loginMessage["data"]["description"].encode('utf-8'))
                 mysess = None
     return mysess
 
@@ -74,9 +75,9 @@ def logout(host, username, pw, session):
         r = session.post(f'https://{host}/logout', headers=httpHeader,
                          json={"data": [username, pw]}, verify=False, timeout=10)
     except(requests.exceptions.Timeout) as err:
-        log.error(f'BMC session request timout error {err}')
+        log.debug(f'BMC session request timout error {err}')
     except(requests.exceptions.ConnectionError) as err:
-        log.error(f'BMC logout session request connect error {err}')
+        log.debug(f'BMC logout session request connect error {err}')
     else:
         if('"message": "200 OK"' in r.text):
             log.debug(f'Host {host}, user {username} has been logged out')
@@ -201,10 +202,10 @@ def chassisPower(host, op, session, timeout=5):
     class PowerOp(Enum):
         status = 'status'
         state = 'status'
-        on = 'on'
-        softoff = 'softoff'
-        hardoff = 'hardoff'
-        off = 'hardoff'
+        on = 'On'
+        softoff = 'Off'
+        hardoff = 'Off'
+        off = 'Off'
         bmcstatus = 'bmcstatus'
 
     msg = {
@@ -227,7 +228,7 @@ def chassisPower(host, op, session, timeout=5):
 
     if PowerOp[op].value not in ('status', 'bmcstatus'):
         if checkFWactivation(host, session):
-            log.warning("Chassis Power control disabled during firmware activation")
+            log.debug("Chassis Power control disabled during firmware activation")
             return
 
             log.debug(msg[op])
@@ -239,15 +240,19 @@ def chassisPower(host, op, session, timeout=5):
             res = session.put(url, headers=httpHeader, data=data, verify=False,
                               timeout=timeout)
         except(requests.exceptions.Timeout) as exc:
-            log.error(f'BMC request timeout error. Host: {host}')
+            log.debug(f'BMC request timeout error. Host: {host}')
             log.debug(exc)
             res = None
         except(requests.exceptions.ConnectionError) as exc:
-            log.error(f'BMC request connection error. Host: {host}')
+            log.debug(f'BMC request connection error. Host: {host}')
             log.debug(exc)
             res = None
         else:
-            res = res.text.lower()
+            log.debug(f'Set power result: {res.text.lower()}')
+            if '200 ok' in res.text.lower():
+                res = op
+            else:
+                res = None
 
     elif PowerOp[op].value in ('bmcstatus', 'status'):
         if PowerOp[op].value == 'bmcstatus':
@@ -258,20 +263,26 @@ def chassisPower(host, op, session, timeout=5):
         try:
             res = session.get(url, headers=httpHeader, verify=False, timeout=timeout)
         except(requests.exceptions.Timeout) as exc:
-            log.error('BMC request timeout error. Host: {host}')
+            log.debug('BMC request timeout error. Host: {host}')
             log.debug(exc)
             res = None
         except(requests.exceptions.ConnectionError) as exc:
-            log.error('BMC request connection error. Host: {host}')
+            log.debug('BMC request connection error. Host: {host}')
             log.debug(exc)
             res = None
         else:
             try:
                 res = json.loads(res.text)['data'].split('.')[-1].lower()
-            except json.JSONDecodeError as exc:
-                log.error(f'Error decoding JSON response from BMC {host}')
+            except (json.JSONDecodeError, AttributeError) as exc:
+                log.debug(f'Error in JSON response from BMC {host}')
                 log.debug(exc)
                 res = None
+            # Make sure the BMC is in ready state or chassis power status
+            # can report incorrectly
+            else:
+                bmc_status = bmcPowerState(host, session, timeout)
+                if bmc_status != 'ready':
+                    res = None
     return res
 
 #        url="https://"+host+"/xyz/openbmc_project/state/host0/attr/CurrentHostState"
@@ -321,6 +332,30 @@ def checkFWactivation(host, session):
                 return True
     return False
 
+def bmcPowerState(host, session, timeout):
+    log = logger.getlogger()
+
+    url = f"https://{host}/xyz/openbmc_project/state/bmc0/attr/CurrentBMCState"
+    httpHeader = {'Content-Type': 'application/json'}
+    try:
+        res = session.get(url, headers=httpHeader, verify=False, timeout=timeout)
+    except(requests.exceptions.Timeout) as exc:
+        log.debug('BMC request timeout error. Host: {host}')
+        log.debug(exc)
+        res = None
+    except(requests.exceptions.ConnectionError) as exc:
+        log.debug('BMC request connection error. Host: {host}')
+        log.debug(exc)
+        res = None
+    else:
+        try:
+            res = json.loads(res.text)['data'].split('.')[-1].lower()
+        except (json.JSONDecodeError, AttributeError) as exc:
+            log.error(f'Error in JSON response from BMC {host}')
+            log.debug(exc)
+            res = None
+    log.debug(f'BMC Power state: {res}')
+    return res
 
 def bmcReset(host, op, session):
     """
