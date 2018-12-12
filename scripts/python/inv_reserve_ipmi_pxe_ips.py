@@ -21,7 +21,7 @@ import sys
 import xmlrpc.client
 from netaddr import IPNetwork
 #from pyghmi import exceptions as pyghmi_exception
-from time import time
+from time import time, sleep
 
 from lib.config import Config
 from lib.inventory import Inventory
@@ -179,13 +179,13 @@ def inv_set_ipmi_pxe_ip(config_path):
             bmc.logout()
 
     log.info('Pausing 1 minute for BMCs to begin reset')
-    time.sleep(60)
+    sleep(60)
 
     # Check connections for set amount of time
     end_time = time() + WAIT_TIME
     while time() < end_time and len(nodes_list) > 0:
         success_list = []
-        time.sleep(2)
+        sleep(2)
         for list_index, node in enumerate(nodes_list):
             hostname = node['hostname']
             index = node['index']
