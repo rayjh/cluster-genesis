@@ -184,6 +184,8 @@ def inv_set_ipmi_pxe_ip(config_path):
     # Check connections for set amount of time
     end_time = time() + WAIT_TIME
     while time() < end_time and len(nodes_list) > 0:
+        print(f'\rTimeout count down: {int(end_time - time())}    ', end='')
+        sys.stdout.flush()
         success_list = []
         sleep(2)
         for list_index, node in enumerate(nodes_list):
@@ -197,7 +199,7 @@ def inv_set_ipmi_pxe_ip(config_path):
             bmc_type = node['bmc_type']
 
             # Attempt to connect to new IPMI IP address
-            bmc = _bmc.Bmc(ipmi_ipaddr, ipmi_userid, ipmi_password, bmc_type)
+            bmc = _bmc.Bmc(ipmi_new_ipaddr, ipmi_userid, ipmi_password, bmc_type)
             if bmc.is_connected():
                 if bmc.chassis_power('status') in ('on', 'off'):
                     log.debug(f'BMC connection success - Node: {hostname} '

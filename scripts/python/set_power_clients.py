@@ -92,7 +92,7 @@ def set_power_clients(state, config_path=None, clients=None, max_attempts=5,
                     bmc_dict[client] = tmp
                     break
                 else:
-                    log.error(f'Failed BMC login attempt {i} BMC: {client}')
+                    log.error(f'Failed BMC login attempt {i + 1} BMC: {client}')
                     time.sleep(1)
                     del tmp
 

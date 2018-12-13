@@ -38,7 +38,7 @@ from lib.genesis import get_dhcp_pool_start, GEN_PATH
 from lib.utilities import sub_proc_exec, sub_proc_launch
 from set_power_clients2 import set_power_clients
 import lib.bmc as _bmc
-from set_power_clients2 import set_power_clients
+from set_power_clients import set_power_clients
 from set_bootdev_clients import set_bootdev_clients
 
 # offset relative to bridge address

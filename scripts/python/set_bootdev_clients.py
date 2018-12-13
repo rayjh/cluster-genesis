@@ -67,7 +67,8 @@ def set_bootdev_clients(bootdev, persist=False, config_path=None, clients=None,
                 _clients.append(ipv4_ipmi)
     if not clients:
         log.debug('Retrieving IPMI address list from inventory')
-        _clients = inv.get_nodes_ipmi_ipaddr(0)
+        code.interact(banner='brk:sbc', local=dict(globals(), **locals()))
+        clients = inv.get_nodes_ipmi_ipaddr(0)
         _clients = clients[:]
 
     if isinstance(clients, list):
@@ -97,7 +98,7 @@ def set_bootdev_clients(bootdev, persist=False, config_path=None, clients=None,
                     bmc_dict[client] = tmp
                     break
                 else:
-                    log.error(f'Failed BMC login attempt {i}, BMC {client}')
+                    log.error(f'Failed BMC login attempt {i + 1}, BMC {client}')
                     time.sleep(1)
                     del tmp
 
