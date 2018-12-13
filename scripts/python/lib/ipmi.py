@@ -89,7 +89,7 @@ def chassisPower(host, op, bmc, timeout=6):
         'softoff': f'Attempting gracefull power off for {host}',
         'hardoff': f'Attempting immediate power off for {host}',
         'off': f'Attempting immediate power off for {host}'
-          }
+    }
 
     try:
         PowerOp[op]
@@ -156,7 +156,7 @@ def hostBootSource(host, source, bmc, timeout=None):
             res = bmc.set_bootdev(BootSource[source].value, persist=False)
         except pyghmi_exception.IpmiException as exc:
             log.error(f'Failed IPMI set boot device {BootSource[source].value} '
-                      f'from BMC {host}')
+                      f'from BMC {host}. {exc} ')
             res = None
         else:
             res = res['bootdev']

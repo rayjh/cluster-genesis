@@ -18,7 +18,6 @@
 import requests
 import json
 from enum import Enum
-import code
 
 import lib.logger as logger
 
@@ -118,10 +117,13 @@ def hostBootMode(host, mode, session, timeout=5):
             log.error('BMC request timeout error.')
             log.debug(exc)
         else:
-            if res.status_code != 200:
-                log.error(f'Error setting boot mode. rc: {res.status_code}'
+            if res.status_code == 200:
+                return BootMode[mode].value.lower()
+            else:
+                log.error(f'Error setting boot source. rc: {res.status_code} '
                           f'reason: {res.reason}')
-            return res.text.lower()
+                return
+
     else:
         url = (f"https://{host}/xyz/openbmc_project/control/host0/boot/one_time/"
                "attr/BootMode")
@@ -168,10 +170,12 @@ def hostBootSource(host, source, session, timeout=5):
         except(requests.exceptions.Timeout) as exc:
             log.error(f'BMC request timeout error. {exc}')
         else:
-            if res.status_code != 200:
+            if res.status_code == 200:
+                return BootSource[source].value.lower()
+            else:
                 log.error(f'Error setting boot source. rc: {res.status_code} '
                           f'reason: {res.reason}')
-                return res.text.lower()
+                return
     else:
         url = (f"https://{host}/xyz/openbmc_project/control/host0/boot/one_time/"
                "attr/BootSource")
@@ -209,14 +213,14 @@ def chassisPower(host, op, session, timeout=5):
         bmcstatus = 'bmcstatus'
 
     msg = {
-           'status': f'Getting power status for {host}',
-           'state': f'Getting power status for {host}',
-           'on': f'Attempting Power on for {host}',
-           'softoff': f'Attempting gracefull power off for {host}',
-           'hardoff': f'Attempting immediate power off for {host}',
-           'off': f'Attempting immediate power off for {host}',
-           'bmcstatus': f'Getting BMC status for {host}'
-           }
+        'status': f'Getting power status for {host}',
+        'state': f'Getting power status for {host}',
+        'on': f'Attempting Power on for {host}',
+        'softoff': f'Attempting gracefull power off for {host}',
+        'hardoff': f'Attempting immediate power off for {host}',
+        'off': f'Attempting immediate power off for {host}',
+        'bmcstatus': f'Getting BMC status for {host}'
+    }
 
     try:
         PowerOp[op]
@@ -332,6 +336,7 @@ def checkFWactivation(host, session):
                 return True
     return False
 
+
 def bmcPowerState(host, session, timeout):
     log = logger.getlogger()
 
@@ -356,6 +361,7 @@ def bmcPowerState(host, session, timeout):
             res = None
     log.debug(f'BMC Power state: {res}')
     return res
+
 
 def bmcReset(host, op, session):
     """

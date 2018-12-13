@@ -23,10 +23,8 @@ import re
 from subprocess import PIPE
 from pyroute2 import IPRoute, NetlinkError
 from netaddr import IPNetwork
-from pyghmi.exceptions import IpmiException
 from orderedattrdict import AttrDict
 from tabulate import tabulate
-import code
 
 import lib.logger as logger
 from lib.config import Config
@@ -38,10 +36,14 @@ from lib.exception import UserException, UserCriticalException
 from get_dhcp_lease_info import GetDhcpLeases
 from lib.genesis import get_dhcp_pool_start, GEN_PATH
 from lib.utilities import sub_proc_exec, sub_proc_launch
+from set_power_clients2 import set_power_clients
 import lib.bmc as _bmc
+from set_power_clients2 import set_power_clients
+from set_bootdev_clients import set_bootdev_clients
 
 # offset relative to bridge address
 NAME_SPACE_OFFSET_ADDR = 1
+
 
 def main(config_path):
     """Validate config"""
@@ -85,8 +87,8 @@ class NetNameSpace(object):
 
         stdout, stderr, rc = sub_proc_exec('ip netns add {}'.format(self.name))
         if rc:
-            self.log.warning('An error occurred while creating namespace '
-                             f' {self.name}.\nreturn code: {rc}\nWarning: {stderr}')
+            self.log.debug('An error occurred while creating namespace '
+                           f' {self.name}.\nreturn code: {rc}\nWarning: {stderr}')
         if stderr:
             if 'File exists' in stderr:
                 self.log.debug(stderr)
@@ -219,7 +221,7 @@ class ValidateClusterHardware(object):
             raise UserException(exc)
         # initialize ipmi list of access info
         self.ran_ipmi = False
-        self.ipmi_list_ai = {}
+        self.bmc_ai = {}
         vlan_ipmi = self.cfg.get_depl_netw_client_vlan(if_type='ipmi')[0]
         vlan_pxe = self.cfg.get_depl_netw_client_vlan(if_type='pxe')[0]
         self.dhcp_pxe_leases_file = GEN_PATH + \
@@ -254,52 +256,71 @@ class ValidateClusterHardware(object):
             pxe_cnt += len(self.cfg.get_client_switch_ports(label, 'pxe'))
         return ipmi_cnt, pxe_cnt
 
-    def _verify_ipmi(self, node_addr_list, cred_list):
-        """ Attempts to discover ipmi credentials and generate a list of all
+    def _get_credentials(self, node_addr_list, cred_list):
+        """ Attempts to discover bmc credentials and generate a list of all
         discovered nodes.  For each node try all available credentials.  If no
-        credentials allow access, the node is not marked as succesful. Nodes
-        which communicate are powered off.
+        credentials allow access, the node is not marked as succesful.
+
         Args:
             node_addr_list (list): list of ipv4 addresses for the discovered
             nodes. (ie those that previously fetched an address from the DHCP
              server.
             cred_list (list of lists): Each list item is a list containing the
-            the userid, password and number of nodes for a node template.
+            the userid, password, bmc_type and number of nodes for a node template.
+        return: bmc access info (dict) : Values hold tuple of userid, password,
+                bmc_type
         """
-        tot = [cred_list[x][2] for x in range(len(cred_list))]
+        tot = [cred_list[x][3] for x in range(len(cred_list))]
         tot = sum(tot)
         left = tot
+        max_attempts = 20
+        delay = 5
+        attempt = 0
+        timeout = 4
         print()
-        self.log.info("Validating IPMI communication")
+        self.log.info("Discover BMC credentials and verify communications")
         print()
+        nodes = {}
+        bmc_ai = {}
         for node in node_addr_list:
-            # resort list each time to maximize the probability of using the
-            # correct credentials with minimum attempts
-            cred_list.sort(key=lambda x: x[2], reverse=True)
-            for j, creds in enumerate(cred_list):
-                bmc = _bmc.Bmc(node, creds[0], creds[1])
-                if bmc.is_connected():
-                    r = bmc.chassis_power('status')
-                    if r:
-                        self.log.debug(f'Node {node} is powered {r}')
-                        self.ipmi_list_ai[node] = cred_list[j][:-1]
-                        cred_list[j][2] -= 1
-                        left -= left
-                        print(f'\r{tot - left} of {tot} nodes communicating via IPMI',
-                              end='')
-                        sys.stdout.flush()
-                        if bmc.chassis_power('off'):
-                            self.log.debug('Powered off node {node}')
+            nodes[node] = False
+        while not all([x for x in nodes.values()]) and attempt <= max_attempts:
+            print(f'\rAttempt count: {max_attempts - attempt}  ', end='')
+            sys.stdout.flush()
+            attempt += 1
+            timeout += 1
+            node_list = [x for x in nodes if not nodes[x]]
+            for node in node_list:
+                # each time through re-sort cred_list based on nodes left with
+                # those credentials to maximize the probability
+                # of using the correct credentials with minimum attempts
+                cred_list.sort(key=lambda x: x[3], reverse=True)
+                for j, creds in enumerate(cred_list):
+                    self.log.debug(f'BMC {node} - Trying userid: {creds[0]} | '
+                                   f'password: {creds[1]} | bmc type: {creds[2]}')
+                    bmc = _bmc.Bmc(node, *creds[:-1], timeout=timeout)
+                    if bmc.is_connected():
+                        r = bmc.chassis_power('status')
+                        self.log.debug(f'Chassis power status: {r}')
+                        if r:
+                            nodes[node] = True
+                            time.sleep(1)
+                            self.log.debug(f'Node {node} is powered {r}')
+                            bmc_ai[node] = tuple(cred_list[j][:-1])
+                            cred_list[j][3] -= 1
+                            left -= left
+                            print(f'\r{tot - left} of {tot} nodes communicating via IPMI',
+                                  end='')
+                            sys.stdout.flush()
+                            bmc.logout()
                         else:
-                            self.log.debug('Failed to power off node {node}')
-                        bmc.logout()
-                        break
-                    else:
-                        self.log.debug(f'No power status response from node {node}')
+                            self.log.debug(f'No power status response from node {node}')
+            time.sleep(delay)
         if left != 0:
-            self.log.error('IPMI communication successful with only {tot - left} '
-                           'of {tot} nodes')
+            self.log.error(f'IPMI communication successful with only {tot - left} '
+                           f'of {tot} nodes')
         print('\n')
+        return bmc_ai
 
     def _get_ipmi_ports(self, switch_lbl):
         """ Get all of the ipmi ports for a given switch
@@ -448,15 +469,14 @@ class ValidateClusterHardware(object):
             the userid, password and number of nodes for a node template.
         """
         for node in node_addr_list:
-            #reset = False
             for j, creds in enumerate(cred_list):
-                bmc = _bmc.Bmc(node, creds[0], creds[1], 'ipmi')
+                bmc = _bmc.Bmc(node, creds[0], creds[1], creds[2])
                 if bmc.is_connected():
                     self.log.info(f'Resetting BMC with existing ip address: {node}')
-                    if bmc.bmc_reset('cold'):
-                        bmc.logout()
-                    else:
+                    if not bmc.bmc_reset('cold'):
                         self.log.error(f'Failed attempting BMC reset on {node}')
+                    bmc.logout()
+                    break
 
     def validate_ipmi(self):
         self.log.info("Discover and validate cluster nodes")
@@ -509,8 +529,8 @@ class ValidateClusterHardware(object):
 
         self._reset_existing_bmcs(node_list, cred_list)
 
-        print('Pause 20s for BMCs to begin reset')
-        time.sleep(20)
+        print('Pause 60s for BMCs to begin reset')
+        time.sleep(60)
 
         dns_list, stderr, rc = sub_proc_exec('pgrep dnsmasq')
         if rc != 0:
@@ -533,7 +553,7 @@ class ValidateClusterHardware(object):
 
         # Scan up to 25 times. Delay 5 seconds between scans
         # Allow infinite number of retries
-        self.log.info('Scanning ipmi network on 5 s intervals')
+        self.log.info('Scanning BMC network on 5 s intervals')
         cnt = 0
         cnt_down = 25
         while cnt < ipmi_cnt:
@@ -586,17 +606,20 @@ class ValidateClusterHardware(object):
 
         if len(node_list) > 0 and len(cred_list) > 0:
             # Verify and power off nodes
-            self._verify_ipmi(node_list, cred_list)
+            self.bmc_ai = self._get_credentials(node_list, cred_list)
+            if not self.bmc_ai:
+                self.log.error('Critical error. Unable to establish BMC communication '
+                               'with any cluster nodes.\n.')
+                sys.exit('Exiting.')
 
-        self.log.info('\nCycling power to all cluster nodes. Pausing 1 minute')
+        # set_power_cients('off') has built in 60 s delay
+        self.log.info('\nPowering off cluster nodes')
+        set_power_clients('off', clients=self.bmc_ai)
 
-        t1 = time.time()
-        self._power_all(self.ipmi_list_ai, 'off')
+        set_power_clients('on', clients=self.bmc_ai)
 
-        while time.time() < t1 + 60:
-            time.sleep(1)
-
-        self._power_all(self.ipmi_list_ai, 'on', bootdev='network')
+        self.log.debug('\nSetting "network" boot device on all nodes')
+        set_bootdev_clients('network', clients=self.bmc_ai)
 
         self.log.debug('Cluster nodes IPMI validation complete')
         self.ran_ipmi = True
@@ -604,13 +627,18 @@ class ValidateClusterHardware(object):
             raise UserException('Not all node IPMI ports validated')
 
     def _get_cred_list(self):
+        """Returns list of list.  Each list has the credentials
+        for a node template(userid, password, bmc_type).
+        Note that there is no association to any ip address.
+        """
         cred_list = []
         for idx in self.cfg.yield_ntmpl_ind():
-            cred_list.append([self.cfg.get_ntmpl_ipmi_userid(index=idx),
-                             self.cfg.get_ntmpl_ipmi_password(index=idx)])
             for idx_ipmi in self.cfg.yield_ntmpl_phyintf_ipmi_ind(idx):
                 port_cnt = self.cfg.get_ntmpl_phyintf_ipmi_pt_cnt(idx, idx_ipmi)
-                cred_list[idx].append(port_cnt)
+            cred_list.append([self.cfg.get_ntmpl_ipmi_userid(index=idx),
+                             self.cfg.get_ntmpl_ipmi_password(index=idx),
+                             self.cfg.get_ntmpl_bmc_type(index=idx),
+                             port_cnt])
         return cred_list
 
     def _teardown_ns(self, ns):
@@ -828,18 +856,16 @@ class ValidateClusterHardware(object):
         # Cycle power on all discovered nodes if bootdev set to 'network'
         if bootdev == 'network':
             self.log.debug('\nCycling power to discovered nodes.\n')
-            t1 = time.time()
-            self._power_all(self.ipmi_list_ai, 'off')
+            set_power_clients('off', clients=self.bmc_ai)
 
-            while time.time() < t1 + 60:
-                time.sleep(1)
+            set_power_clients('on', clients=self.bmc_ai)
 
-            self._power_all(self.ipmi_list_ai, 'on', bootdev, persist=False)
+            set_bootdev_clients('network', clients=self.bmc_ai)
 
         self._teardown_ns(self.ipmi_ns)
 
-#        # Reset BMCs to insure they acquire a new address from container
-#        # during inv_add_ports. Avoids conflicting addresses during redeploy
+        # Reset BMCs to insure they acquire a new address from container
+        # during inv_add_ports. Avoids conflicting addresses during redeploy
         self._reset_existing_bmcs(self.node_list, self._get_cred_list())
 
         self.log.info('Cluster nodes validation complete')
@@ -886,82 +912,6 @@ class ValidateClusterHardware(object):
                 self.log.debug('Found in table: {} item: {}'.format(val, item))
                 return True
         return False
-
-    def _reset_bmcs(self, ipmi_list_ai):
-        print('Resetting BMCs')
-        for node in ipmi_list_ai.keys():
-            print(node)
-            try:
-                bmc = bmc_ipmi_login(node,
-                                     self.ipmi_list_ai[node][0],
-                                     self.ipmi_list_ai[node][1])
-            except IpmiException as exc:
-                self.log.error(str(exc))
-                break
-
-            try:
-                bmc.reset_bmc()
-            except IpmiException as exc:
-                self.log.error('Failed attempting BMC reset on {}'.format(node[0]))
-
-            bmc_ipmi_logout(bmc)
-
-    def _power_all(self, ipmi_list_ai, state, bootdev=None, persist=False):
-        """Set bootdev and Power on or off all nodes in node_list
-        Args:
-            ipmi_list_ai (list of dict{(ipv4),[list of userid, password]}):
-            state (str): 'on' or 'off'
-            bootdev (str): 'network' or 'default'
-        """
-        if bootdev:
-            t1 = time.time()
-            for node in sorted(ipmi_list_ai):
-                bmc = _bmc.Bmc(node, self.ipmi_list_ai[node][0],
-                                 self.ipmi_list_ai[node][1])
-                if bmc.is_connected():
-                    if bmc.host_boot_source(bootdev):
-                        self.log.debug(f'Node boot device set to {bootdev}')
-                    else:
-                        self.log.debug(f'Failed setting bootdev to {bootdev} '
-                                       f'on node {node}')
-                    bmc.logout()
-                else:
-                    self.log.error('Failed login to BMC {node}')
-
-
-#            while time.time() < t1 + 1:
-            time.sleep(1)
-
-        for node in sorted(ipmi_list_ai):
-            for attempt in range(4):
-                bmc = _bmc.Bmc(node, self.ipmi_list_ai[node][0],
-                                 self.ipmi_list_ai[node][1])
-                if bmc.is_connected():
-                    if bmc.chassis_power(state):
-                        self.log.debug('Node {node} powered {state}')
-                        if bmc.logout():
-                            self.log.debug('Node {node} logged out of BMC')
-                            break
-                        else:
-                            self.log.debug('Node {node} failed log out of BMC')
-                    else:
-                        self.log.debug('Node {node} failed to power {state}')
-                time.sleep(1)
-
-        for node in sorted(ipmi_list_ai):
-            for i in range(4):
-                bmc = _bmc.Bmc(node, self.ipmi_list_ai[node][0],
-                                 self.ipmi_list_ai[node][1])
-                if bmc.is_connected():
-                    if bmc.chassis_power('status') == 'state':
-                        self.log.debug(f'Chassis power state set for node {node}')
-                        if bmc.logout():
-                            self.log.debug('Node {node} logged out of BMC')
-                            break
-                        else:
-                            self.log.debug('Node {node} failed log out of BMC')
-                    else:
-                        self.log.debug(f'Chassis power state not set for node {node}')
 
     def _get_network(self, type_):
         """Returns details of a Power-Up network.

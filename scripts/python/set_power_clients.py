@@ -15,44 +15,68 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import argparse
 import time
-from pyghmi import exceptions as pyghmi_exception
 
 from lib.inventory import Inventory
 import lib.logger as logger
 import lib.bmc as _bmc
 
 
-def set_power_clients(state, config_path=None, client_list=None, max_attempts=5,
+def set_power_clients(state, config_path=None, clients=None, max_attempts=5,
                       wait=6):
-    """Set power on or off for multiple clients
+    """Set power on or off for multiple clients. If a list of ip addresses
+    are given or no clients given then the credentials are looked up in an
+    inventory file. If clients is a dictionary, then the credentials are
+    taken from the dictionary values.
+
     Args:
         state (str) : 'on' or 'off'
-        client_list (list of str): list of IP addresses
+        config_path (str): path to a config file
+        clients (dict or list of str): list of IP addresses or
+        dict of ip addresses with values of credentials as tuple
+        ie {'192.168.1.2': ('user', 'password', 'bmc_type')}
     """
     log = logger.getlogger()
-    inv = Inventory(config_path)
+    if config_path:
+        inv = Inventory(config_path)
     wait = float(wait)
     max_attempts = int(max_attempts)
 
-    if not client_list:
+    def _get_cred_list(client_list=None):
+        """Returns dict with values of tuples.  Each tuple has the credentials
+        for a node (userid, password, bmc_type). If no client list
+        is passed, all nodes are returned
+        Args:
+            client_list (list of str): each list item is an ipv4 address
+        """
+        cred_list = {}
+        for index, hostname in enumerate(inv.yield_nodes_hostname()):
+            ipv4 = inv.get_nodes_ipmi_ipaddr(0, index)
+            if client_list and ipv4 not in client_list:
+                continue
+            # rack_id = inv.get_nodes_rack_id(index)
+            userid = inv.get_nodes_ipmi_userid(index)
+            password = inv.get_nodes_ipmi_password(index)
+            bmc_type = inv.get_nodes_bmc_type(index)
+            cred_list[ipv4] = (userid, password, bmc_type)
+        return cred_list
+
+    if isinstance(clients, list) or not clients:
         log.debug('Retrieving IPMI address list from inventory')
-        client_list = inv.get_nodes_ipmi_ipaddr(0)
+        cred_list = _get_cred_list(clients)
+    else:
+        # insure cred info in tuple
+        cred_list = {}
+        for client in clients:
+            cred_list[client] = tuple(clients[client])
 
-    clients_left = client_list[:]
+    clients_left = list(cred_list.keys())
     attempt = 0
-
-    none_cnt = 0
-    for client in client_list:
-        if client is None:
-            none_cnt += 1
-            log.warning('client node ip address is "None"')
-            clients_left.remove(None)
 
     clients_left.sort()
     while clients_left and attempt < max_attempts:
-        nodes = {}
         attempt += 1
         if attempt > 1:
             print('Retrying set power {}. Attempt {} of {}'
@@ -60,26 +84,17 @@ def set_power_clients(state, config_path=None, client_list=None, max_attempts=5,
             print('Clients remaining: {}'.format(clients_left))
         clients_set = []
         bmc_dict = {}
-        for index, hostname in enumerate(inv.yield_nodes_hostname()):
-            ipv4 = inv.get_nodes_ipmi_ipaddr(0, index)
-            if ipv4 is None or ipv4 not in clients_left:
-                continue
-            rack_id = inv.get_nodes_rack_id(index)
-            userid = inv.get_nodes_ipmi_userid(index)
-            password = inv.get_nodes_ipmi_password(index)
-            bmc_type = inv.get_nodes_bmc_type(index)
-            nodes[ipv4] = [rack_id, ipv4]
-            if ipv4 in clients_left:
-                for i in range(2):
-                    tmp = _bmc.Bmc(ipv4, userid, password, bmc_type)
-                    if tmp.is_connected():
-                        bmc_dict[ipv4] = tmp
-                        break
-                    else:
-                        log.error(f'Failed IPMI login attempt {i}, rack: {rack_id} '
-                                  f'BMC {ipv4}')
-                        time.sleep(1)
-                        del tmp
+        for client in clients_left:
+            for i in range(2):
+                log.debug(f'Attempting login to BMC: {client}')
+                tmp = _bmc.Bmc(client, *cred_list[client])
+                if tmp.is_connected():
+                    bmc_dict[client] = tmp
+                    break
+                else:
+                    log.error(f'Failed BMC login attempt {i} BMC: {client}')
+                    time.sleep(1)
+                    del tmp
 
         for client in clients_left:
             if client in bmc_dict:
@@ -122,8 +137,8 @@ def set_power_clients(state, config_path=None, client_list=None, max_attempts=5,
         del bmc_dict
 
     log.info('Powered {} {} of {} client devices.'
-             .format(state, len(client_list) - (len(clients_left) + none_cnt),
-                     len(client_list)))
+             .format(state, len(cred_list) - len(clients_left),
+                     len(cred_list)))
 
     if state == 'off':
         print('Pausing 60 sec for client power off')
@@ -145,8 +160,9 @@ if __name__ == '__main__':
     parser.add_argument('config_path',
                         help='Config file path.')
 
-    parser.add_argument('client_list', default='', nargs='*',
-                        help='List of ip addresses.')
+    parser.add_argument('clients', default='',
+                        help='dict of ip addresses with credentials in list.\n'
+                        'in json format: {"192.168.30.21": ["root", "0penBmc", "openbmc"]}')
 
     parser.add_argument('max_attempts', default='2', nargs='*',
                         help='Max number of login / power attempts')
@@ -162,5 +178,10 @@ if __name__ == '__main__':
     if args.log_lvl_print == 'debug':
         print(args)
 
-    set_power_clients(args.state, args.config_path, args.client_list,
+    if args.clients:
+        _clients = json.loads(args.clients)
+    else:
+        _clients = ''
+
+    set_power_clients(args.state, args.config_path, _clients,
                       max_attempts=args.max_attempts)
