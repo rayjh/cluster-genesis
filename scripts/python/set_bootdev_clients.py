@@ -18,7 +18,6 @@
 import argparse
 import time
 import json
-import code
 
 from lib.inventory import Inventory
 import lib.logger as logger
@@ -67,7 +66,6 @@ def set_bootdev_clients(bootdev, persist=False, config_path=None, clients=None,
                 _clients.append(ipv4_ipmi)
     if not clients:
         log.debug('Retrieving IPMI address list from inventory')
-        code.interact(banner='brk:sbc', local=dict(globals(), **locals()))
         clients = inv.get_nodes_ipmi_ipaddr(0)
         _clients = clients[:]
 
