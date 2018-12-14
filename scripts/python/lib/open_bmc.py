@@ -59,7 +59,7 @@ def login(host, username, pw, timeout=10):
     return mysess
 
 
-def logout(host, username, pw, session):
+def logout(host, username, pw, session, timeout=10):
     """
          Logs out of the bmc and terminates the session
 
@@ -72,7 +72,7 @@ def logout(host, username, pw, session):
     httpHeader = {'Content-Type': 'application/json'}
     try:
         r = session.post(f'https://{host}/logout', headers=httpHeader,
-                         json={"data": [username, pw]}, verify=False, timeout=10)
+                         json={"data": [username, pw]}, verify=False, timeout=timeout)
     except(requests.exceptions.Timeout) as err:
         log.debug(f'BMC session request timout error {err}')
     except(requests.exceptions.ConnectionError) as err:
