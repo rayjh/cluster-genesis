@@ -119,7 +119,8 @@ class Lenovo(SwitchCommon):
             for line in port_info:
                 # pad to 86 chars
                 line = f'{line:<86}'
-                match = re.search(r'\w+\s+\d+\s+(y|n)', line)
+                # look for rows (look for first few fields)
+                match = re.search(r'^\s*\w+\s+\d+\s+(y|n)', line)
                 if match:
                     port = str(int(line[indcs['Port'][0]:indcs['Port'][1]]))
                     mode = line[indcs['Tag'][0]:indcs['Tag'][1]]
@@ -131,7 +132,8 @@ class Lenovo(SwitchCommon):
                 # look for avlan continuation lines
                 # look for leading spaces (10 is arbitrary)
                 if f"{' ':<10}" == line[:10]:
-                    match = re.search(r'^(\d+ |(\d+-\d+ ))+\d+', line.strip(' '))
+                    avlans = line[indcs['VLAN\(s'][0]:indcs['VLAN\(s'][1]].strip(' ')
+                    match = re.search(r'^(\d+ |(\d+-\d+ ))+\d+', avlans)
                     if match:
                         avlans = _get_avlans(match.group(0))
                         ports[port]['avlans'] += f', {avlans}'
