@@ -58,7 +58,7 @@ class OSinstall(npyscreen.NPSAppManaged):
         return ifcs_state
 
     def get_up_phys_ifcs(self):
-        """ Create a dictionary of links.  For each link, val = operational state
+        """ Create a list of 'UP' links.
         """
         ifcs_up = []
         for link in IPR.get_links():
@@ -69,8 +69,26 @@ class OSinstall(npyscreen.NPSAppManaged):
                     #ifcs_state[link_name] = link.get_attr('IFLA_OPERSTATE')
         return ifcs_up
 
+    def is_valid_profile(self):
+        """ Validates the content of the profile data.
+        Returns:
+            msg (str) empty if passed, else contains warning and error msg
+        """
+        msg = ''
+        p = self.get_profile_tuple()
+
+        if u.is_overlapping_addr(f'{p.bmc_subnet}/{p.bmc_subnet_prefix}',
+                                 f'{p.pxe_subnet}/{p.pxe_subnet_prefix}'):
+            msg += 'Warning, BMC and PXE subnets are overlapping\n'
+
+        if p.bmc_subnet_prefix != p.pxe_subnet_prefix:
+            msg += 'Warning, BMC and PXE subnets are different sizes\n'
+
+        return msg
+
     def onStart(self):
-        self.addForm('MAIN', OSinstall_form, name='Welcome to PowerUP')
+        self.addForm('MAIN', OSinstall_form, name='Welcome to PowerUP    '
+                     'Press F1 in any field for field help')
 
     def load_profile(self, profile):
         try:
@@ -334,4 +352,6 @@ if __name__ == '__main__':
     osi.load_profile(profile)
     osi.run()
     p = osi.get_profile_tuple()
+    msg = osi.is_valid_profile()
+    print(msg)
     print(p)
