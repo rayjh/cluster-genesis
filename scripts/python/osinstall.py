@@ -32,6 +32,8 @@ GEN_SAMPLE_CONFIGS_PATH = get_sample_configs_path()
 
 IPR = IPRoute()
 
+PROFILE = 'profile.yml'
+
 
 class OSinstall(npyscreen.NPSAppManaged):
 
@@ -362,16 +364,32 @@ class OSinstall_form(npyscreen.ActionFormV2):
 #                                     name='Press me')
 
 
-if __name__ == '__main__':
+def validate(profile_tuple):
+    LOG = logger.getlogger()
+    if profile_tuple.bmc_address_mode == "dhcp" or profile_tuple.pxe_address_mode == "dhcp":
+        hasDhcpServers = u.has_dhcp_servers(profile_tuple.ethernet_port)
+        if not hasDhcpServers:
+            LOG.warn("No Dhcp servers found on {0}".format(profile_tuple.ethernet_port))
+        else:
+            LOG.info("Dhcp servers found on {0}".format(profile_tuple.ethernet_port))
 
+
+def main():
     logger.create('nolog', 'info')
-    log = logger.getlogger()
+    LOG = logger.getlogger()
+    try:
+        profile = 'profile.yml'
+        osi = OSinstall()
+        osi.load_profile(profile)
+        osi.run()
+        p = osi.get_profile_tuple()
+        LOG.debug(p)
+        validate(p)
+        print(p)
+    except KeyboardInterrupt:
+        LOG.info("Exiting at user request")
 
-    profile = 'profile.yml'
-    osi = OSinstall()
-    osi.load_profile(profile)
-    osi.run()
-    p = osi.get_profile_tuple()
-    msg = osi.is_valid_profile()
-    print(msg)
-    print(p)
+
+if __name__ == '__main__':
+    main()
+>>>>>>> master
