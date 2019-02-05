@@ -1102,50 +1102,167 @@ class software(object):
                 repo.sync(pkg3_list, url + 'simple', py_ver=36)
 
         # Setup EPEL Repo
-        repo_id = 'epel-ppc64le'
-        repo_name = 'Extra Packages for Enterprise Linux 7 (EPEL) - ppc64le'
-        baseurl = 'https://mirrors.fedoraproject.org/metalink?repo=epel-7&arch=ppc64le'
-        gpgkey = 'file:///etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-7'
+
+        repo_id = 'dependencies'
+        repo_name = 'Dependencies'
+        baseurl = ''
         heading1(f'Set up {repo_name} repository')
+        # list to str
+        dep_list = ' '.join(self.pkgs['yum_pkgs'])
+
+        file_more = GEN_SOFTWARE_PATH + 'epel-packages.list'
+        if os.path.isfile(file_more):
+            try:
+                with open(file_more, 'r') as f:
+                    more = f.read()
+            except:
+                self.log.error('Error reading {file_more}')
+                more = ''
+            else:
+                more.replace(',', ' ')
+                more.replace('\n', ' ')
+        else:
+            more = ''
+
         if f'{repo_id}_alt_url' in self.sw_vars:
             alt_url = self.sw_vars[f'{repo_id}_alt_url']
         else:
             alt_url = None
 
-        exists = self.status_prep(which='EPEL Repository')
+        exists = self.status_prep(which='Dependent Packages Repository')
         if exists:
-            self.log.info('The EPEL Repository exists already'
+            self.log.info(f'The {repo_name} repository exists already'
                           ' in the POWER-Up server')
+            pr_str = (f'\nDo you want to resync the {repo_name} repository'
+                      ' at this time\n')
+        else:
+            pr_str = (f'\nDo you want to create the {repo_name} repository'
+                      ' at this time\n')
 
-        repo = PowerupYumRepoFromRepo(repo_id, repo_name)
+        ch = 'S'
+        if get_yesno(prompt=pr_str, yesno='Y/n'):
+            if platform.machine() == self.arch:
+                ch, item = get_selection('Sync required dependent packages from Enabled YUM repos\n'
+                                         'Create from package files in a local Directory\n'
+                                         'Sync from an alternate Repository\n'
+                                         'Skip',
+                                         'E\nD\nR\nS',
+                                         'Repository source? ')
+            else:
+                ch, item = get_selection('Create from package files in a local Directory\n'
+                                         'Sync from an alternate Repository\n'
+                                         'Skip',
+                                         'D\nR\nS',
+                                         'Repository source? ')
 
-        ch = repo.get_action(exists)
-        if ch in 'Y':
-            url = repo.get_repo_url(baseurl, alt_url, contains=[repo_id],
-                                    filelist=['epel-release-*'])
-            if url:
-                if not url == baseurl:
-                    self.sw_vars[f'{repo_id}_alt_url'] = url
-                    content = repo.get_yum_dotrepo_content(url, gpgkey=gpgkey)
-                else:
-                    content = repo.get_yum_dotrepo_content(url, gpgkey=gpgkey,
-                                                           metalink=True)
-                repo.write_yum_dot_repo_file(content)
+        if ch == 'E':
+            repo = PowerupRepo(repo_id, repo_name)
+            repo_dir = repo.get_repo_dir()
+            self._add_dependent_packages(repo_dir, dep_list)
+            self._add_dependent_packages(repo_dir, more)
+            repo.create_meta()
+            content = repo.get_yum_dotrepo_content(gpgcheck=0, local=True)
+            repo.write_yum_dot_repo_file(content)
+            content = repo.get_yum_dotrepo_content(gpgcheck=0, client=True)
+            filename = repo_id + '-powerup.repo'
+            self.sw_vars['yum_powerup_repo_files'][filename] = content
 
-            if url:
-                repo.sync()
-                # recheck status after sync.
-                exists = self.status_prep(which='EPEL Repository')
-                if not exists:
-                    repo.create_meta()
-                else:
-                    repo.create_meta(update=True)
+        elif ch == 'D':
+            repo = PowerupRepoFromDir(repo_id, repo_name)
 
+            if f'{repo_id}_src_dir' in self.sw_vars:
+                src_dir = self.sw_vars[f'{repo_id}_src_dir']
+            else:
+                src_dir = None
+            src_dir, dest_dir = repo.copy_dirs(src_dir)
+            if src_dir:
+                self.sw_vars[f'{repo_id}_src_dir'] = src_dir
+                repo.create_meta()
                 content = repo.get_yum_dotrepo_content(gpgcheck=0, local=True)
                 repo.write_yum_dot_repo_file(content)
                 content = repo.get_yum_dotrepo_content(gpgcheck=0, client=True)
                 filename = repo_id + '-powerup.repo'
                 self.sw_vars['yum_powerup_repo_files'][filename] = content
+
+        elif ch == 'R':
+            if f'{repo_id}_alt_url' in self.sw_vars:
+                alt_url = self.sw_vars[f'{repo_id}_alt_url']
+            else:
+                alt_url = None
+
+            repo = PowerupYumRepoFromRepo(repo_id, repo_name)
+
+            url = repo.get_repo_url(baseurl, alt_url, contains=[repo_id],
+                                    filelist=['bzip2-*'])
+            if url:
+                if not url == baseurl:
+                    self.sw_vars[f'{repo_id}_alt_url'] = url
+                # Set up access to the repo
+                content = repo.get_yum_dotrepo_content(url, gpgcheck=0)
+                repo.write_yum_dot_repo_file(content)
+
+                repo.sync()
+                repo.create_meta()
+
+                # Setup local access to the new repo copy in /srv/repo/
+                if platform.machine() == self.arch:
+                    content = repo.get_yum_dotrepo_content(gpgcheck=0, local=True)
+                    repo.write_yum_dot_repo_file(content)
+                # Prep setup of POWER-Up client access to the repo copy
+                content = repo.get_yum_dotrepo_content(gpgcheck=0, client=True)
+                filename = repo_id + '-powerup.repo'
+                self.sw_vars['yum_powerup_repo_files'][filename] = content
+                self.log.info('Repository setup complete')
+
+        else:
+            print(f'{repo_name} repository not updated')
+
+#        repo_id = 'epel-ppc64le'
+#        repo_name = 'Extra Packages for Enterprise Linux 7 (EPEL) - ppc64le'
+#        baseurl = 'https://mirrors.fedoraproject.org/metalink?repo=epel-7&arch=ppc64le'
+#        gpgkey = 'file:///etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-7'
+#        heading1(f'Set up {repo_name} repository')
+#        if f'{repo_id}_alt_url' in self.sw_vars:
+#            alt_url = self.sw_vars[f'{repo_id}_alt_url']
+#        else:
+#            alt_url = None
+#
+#        exists = self.status_prep(which='EPEL Repository')
+#        if exists:
+#            self.log.info('The EPEL Repository exists already'
+#                          ' in the POWER-Up server')
+#
+#        repo = PowerupYumRepoFromRepo(repo_id, repo_name)
+#
+#        ch = repo.get_action(exists)
+#        if ch in 'Y':
+#            url = repo.get_repo_url(baseurl, alt_url, contains=[repo_id],
+#                                    filelist=['epel-release-*'])
+#            if url:
+#                if not url == baseurl:
+#                    self.sw_vars[f'{repo_id}_alt_url'] = url
+#                    content = repo.get_yum_dotrepo_content(url, gpgkey=gpgkey)
+#                else:
+#                    content = repo.get_yum_dotrepo_content(url, gpgkey=gpgkey,
+#                                                           metalink=True)
+#                repo.write_yum_dot_repo_file(content)
+#
+#            if url:
+#                repo.sync()
+#                # recheck status after sync.
+#                exists = self.status_prep(which='EPEL Repository')
+#                if not exists:
+#                    repo.create_meta()
+#                else:
+#                    repo.create_meta(update=True)
+#
+#                content = repo.get_yum_dotrepo_content(gpgcheck=0, local=True)
+#                repo.write_yum_dot_repo_file(content)
+#                content = repo.get_yum_dotrepo_content(gpgcheck=0, client=True)
+#                filename = repo_id + '-powerup.repo'
+#                self.sw_vars['yum_powerup_repo_files'][filename] = content
+
+
 
         # Create custom repositories
         heading1('Create custom repositories')
