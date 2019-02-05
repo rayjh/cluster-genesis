@@ -1102,7 +1102,6 @@ class software(object):
                 repo.sync(pkg3_list, url + 'simple', py_ver=36)
 
         # Setup EPEL Repo
-
         repo_id = 'dependencies'
         repo_name = 'Dependencies'
         baseurl = ''
@@ -1261,7 +1260,6 @@ class software(object):
 #                content = repo.get_yum_dotrepo_content(gpgcheck=0, client=True)
 #                filename = repo_id + '-powerup.repo'
 #                self.sw_vars['yum_powerup_repo_files'][filename] = content
-
 
 
         # Create custom repositories
