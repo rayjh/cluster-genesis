@@ -24,6 +24,7 @@ import copy
 from orderedattrdict.yamlutils import AttrDictYAMLLoader
 from collections import namedtuple
 from pyroute2 import IPRoute
+import re
 import sys
 from time import sleep
 
@@ -219,7 +220,7 @@ class OSinstall(npyscreen.NPSAppManaged):
                 msg += ['- Warning a DHCP server exists already on',
                         '  the interface specified for BMC access. ',
                         f'  Offered address: {dhcp["IP Offered"]}',
-                        f'  From server: {dhcp["Server Identifier"]}']
+                        f'  From server:     {dhcp["Server Identifier"]}']
 
         if prof.pxe_ethernet_ifc.val:
             dhcp = u.get_dhcp_servers(prof.pxe_ethernet_ifc.val)
@@ -227,7 +228,7 @@ class OSinstall(npyscreen.NPSAppManaged):
                 msg += ['- Warning a DHCP server exists already on',
                         '  the interface specified for PXE access. ',
                         f'  Offered address: {dhcp["IP Offered"]}',
-                        f'  From server: {dhcp["Server Identifier"]}']
+                        f'  From server:     {dhcp["Server Identifier"]}']
 
         return msg
 
@@ -422,7 +423,8 @@ class Pup_form(npyscreen.ActionFormV2):
 
     def on_ok(self):
         for item in self.node:
-            if hasattr(self.node[item], 'dtype') and self.node[item]['dtype'] == 'no-save':
+            if (hasattr(self.node[item], 'dtype') and
+                    self.node[item]['dtype'] == 'no-save'):
                 continue
             if hasattr(self.node[item], 'ftype'):
                 if self.node[item]['ftype'] == 'eth-ifc':
@@ -448,7 +450,8 @@ class Pup_form(npyscreen.ActionFormV2):
                     self.node[item]['val'] = self.fields[item].value
         msg = ['Validating network profile']
         if (hasattr(self.node, 'bmc_address_mode')):
-            if self.node.bmc_address_mode.val == 'dhcp' or self.node.pxe_ethernet_ifc.val:
+            if (self.node.bmc_address_mode.val == 'dhcp' or
+                    self.node.pxe_ethernet_ifc.val):
                 msg += ['and checking for existing DHCP servers']
             npyscreen.notify(msg, title='Info')
             sleep(1)
@@ -467,7 +470,8 @@ class Pup_form(npyscreen.ActionFormV2):
                         '(No to continue editing the profile data)']
 
                 editw = 1 if len(msg) < 10 else 0
-                res = npyscreen.notify_yes_no(msg, title='Profile validation', editw=editw)
+                res = npyscreen.notify_yes_no(msg, title='Profile validation',
+                                              editw=editw)
 
         if res:
             if self.parentApp.NEXT_ACTIVE_FORM == 'MAIN':
@@ -480,6 +484,42 @@ class Pup_form(npyscreen.ActionFormV2):
         else:
             # stay on this form
             self.next_form = self.parentApp.NEXT_ACTIVE_FORM
+
+    def get_mask_and_prefix(self, mask_prefix):
+        """ Extracts a mask and prefix from a string containing a mask and / or
+            a prefix.
+        Args:
+            mask_prefix (str): Of the form 'ipmask prefix' or ipmask or prefix
+        """
+        match1 = re.search(r'(?:.*\s+)*((?:\d{1,3}\.){3}\d{1,3})\s*', mask_prefix)
+        match2 = re.search(r'(?:.*\s+)*(\d{1,2})\s*.*$', mask_prefix)
+
+        if match1:
+            try:
+                parts = match1.group(1).strip().split('.')
+                if len(parts) == 4 and all(0 <= int(part) < 256 for part in parts):
+                    mask = match1.group(1)
+            except (ValueError, AttributeError, TypeError):
+                mask = None
+        else:
+            mask = None
+
+        if match2:
+            try:
+                prefix = int(match2.group(1))
+                prefix = prefix if 0 < prefix < 33 else None
+            except (ValueError, TypeError):
+                prefix = None
+        else:
+            prefix = None
+
+        msg = ('The entered mask and prefix do not match. The prefix value will be '
+               'used. If you wish to enter just a netmask, a prefix will be calculated. '
+               'If you wish to enter just a prefix, a netmask will be calulated.')
+        if prefix != u.get_prefix(mask):
+            npyscreen.notify_confirm(msg, editw=1)
+
+        return mask, prefix
 
     def while_editing(self, instance):
         # instance is the instance of the widget you're moving into
@@ -496,16 +536,6 @@ class Pup_form(npyscreen.ActionFormV2):
                 field_dtype = self.node[field]['dtype']
             else:
                 field_dtype = None
-#            if hasattr(self.node[self.prev_field], 'dtype'):
-#                prev_field_dtype = self.node[self.prev_field]['dtype']
-#            else:
-#                prev_field_dtype = None
-
-#            if hasattr(self.node[self.prev_field], 'ftype'):
-#                prev_field_ftype = self.node[self.prev_field]['ftype']
-#            else:
-#                prev_field_ftype = None
-
         if self.prev_field and field_dtype != 'no-save':
             if hasattr(self.node[self.prev_field], 'dtype'):
                 prev_fld_dtype = self.node[self.prev_field]['dtype']
@@ -528,7 +558,8 @@ class Pup_form(npyscreen.ActionFormV2):
                                              title=self.prev_field, editw=1)
                 else:
                     if prev_fld_lnkd_flds:
-                        prefix = int(self.fields[prev_fld_lnkd_flds.prefix].value.split()[-1])
+                        prefix = int(self.fields[prev_fld_lnkd_flds.prefix].
+                                     value.split()[-1])
 
                         net_addr = u.get_network_addr(prev_fld_val, prefix)
                         if net_addr != prev_fld_val:
@@ -537,7 +568,8 @@ class Pup_form(npyscreen.ActionFormV2):
                             self.fields[self.prev_field].value = net_addr
                             self.display()
 
-                        cidr = prev_fld_val + '/' + self.fields[prev_fld_lnkd_flds.prefix].value.split()[-1]
+                        cidr = (prev_fld_val + '/' + self.fields[prev_fld_lnkd_flds.
+                                prefix].value.split()[-1])
                         ifc = self.parentApp.ifcs.get_interface_for_route(cidr)
                         # npyscreen.notify_confirm(f'ifc: {ifc}', editw=1)
                     if not ifc:
@@ -545,34 +577,44 @@ class Pup_form(npyscreen.ActionFormV2):
                     else:
                         ifc = [ifc]
                     if ifc:
-                        self.fields[self.node[self.prev_field]['lnkd_flds']['ifc']].values = ifc
+                        self.fields[self.node[self.prev_field]['lnkd_flds']['ifc']].\
+                            values = ifc
                         idx = 0 if len(ifc) == 1 else None
-                        self.fields[self.node[self.prev_field]['lnkd_flds']['ifc']].value = idx
+                        self.fields[self.node[self.prev_field]['lnkd_flds']['ifc']].\
+                            value = idx
                         self.display()
 
             elif prev_fld_dtype == 'ipv4mask':
-                prefix = int(prev_fld_val.split()[-1])
-                if prefix < 1 or prefix > 32:
+                mask, prefix = self.get_mask_and_prefix(prev_fld_val)
+                if not prefix and not mask:
                     npyscreen.notify_confirm(f'Invalid Field value: {prev_fld_val}',
                                              title=self.prev_field, editw=1)
                     prefix = 24
-                # update the mask part of the field
-                if len(prev_fld_val.split()[-1]) == 2:
+                    mask = '255.255.255.0'
+                elif prefix:
                     mask = u.get_netmask(prefix)
-                    self.fields[self.prev_field].value = f'{mask} {prefix}'
-                    self.display()
+                else:
+                    prefix = u.get_prefix(mask)
+
+                self.fields[self.prev_field].value = f'{mask} {prefix}'
+                self.display()
+
                 if prev_fld_lnkd_flds:
                     # get the ip address from the linked field
-                    cidr = self.fields[prev_fld_lnkd_flds.subnet].value + '/' + prev_fld_val.split()[-1]
+                    cidr = (self.fields[prev_fld_lnkd_flds.subnet].value + '/' +
+                            self.fields[self.prev_field].value.split()[-1])
+                    # npyscreen.notify_confirm(f'cidr: {cidr}', editw=1)
                     ifc = self.parentApp.ifcs.get_interface_for_route(cidr)
                     if not ifc:
                         ifc = self.parentApp.ifcs.get_up_interfaces_names(_type='phys')
                     else:
                         ifc = [ifc]
                     if ifc:
-                        self.fields[self.node[self.prev_field]['lnkd_flds']['ifc']].values = ifc
+                        self.fields[self.node[self.prev_field]['lnkd_flds']['ifc']].\
+                            values = ifc
                         idx = 0 if len(ifc) == 1 else None
-                        self.fields[self.node[self.prev_field]['lnkd_flds']['ifc']].value = idx
+                        self.fields[self.node[self.prev_field]['lnkd_flds']['ifc']].\
+                            value = idx
                         self.display()
 
             elif 'int-or-none' in prev_fld_dtype:
@@ -588,9 +630,10 @@ class Pup_form(npyscreen.ActionFormV2):
                                                  "or leave blank",
                                                  title=self.prev_field, editw=1)
                     else:
-                        if int(prev_fld_val) < int(rng[0]) or int(prev_fld_val) > int(rng[1]):
-                            msg = (f'Invalid Field value: {prev_fld_val}. Please leave empty or '
-                                   'enter a value between 2 and 4094.')
+                        if (int(prev_fld_val) < int(rng[0]) or
+                                int(prev_fld_val) > int(rng[1])):
+                            msg = (f'Invalid Field value: {prev_fld_val}. Please '
+                                   'leave empty or enter a value between 2 and 4094.')
                             npyscreen.notify_confirm(msg, title=self.prev_field, editw=1)
 
             elif 'int' in prev_fld_dtype:
@@ -602,14 +645,16 @@ class Pup_form(npyscreen.ActionFormV2):
                         npyscreen.notify_confirm(f'Enter digits 0-9',
                                                  title=self.prev_field, editw=1)
                     else:
-                        if int(prev_fld_val) < int(rng[0]) or int(prev_fld_val) > int(rng[1]):
-                            msg = (f'Invalid Field value: {prev_fld_val}. Please enter a value '
-                                   f'between 2 and 4094.')
+                        if (int(prev_fld_val) < int(rng[0]) or
+                                int(prev_fld_val) > int(rng[1])):
+                            msg = (f'Invalid Field value: {prev_fld_val}. Please enter '
+                                   'a value between 2 and 4094.')
                             npyscreen.notify_confirm(msg, title=self.prev_field, editw=1)
 
             elif 'file' in prev_fld_dtype:
                 if not os.path.isfile(prev_fld_val):
-                    npyscreen.notify_confirm(f'Specified iso file does not exist: {prev_fld_val}',
+                    npyscreen.notify_confirm('Specified iso file does not exist: '
+                                             'f{prev_fld_val}',
                                              title=self.prev_field, editw=1)
                 elif '-iso' in prev_fld_dtype and '.iso' not in prev_fld_val:
                     npyscreen.notify_confirm('Warning, the selected file does not have a '
