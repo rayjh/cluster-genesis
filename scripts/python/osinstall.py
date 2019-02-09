@@ -422,19 +422,32 @@ class Pup_form(npyscreen.ActionFormV2):
             self.next_form = fvl[-1]
 
     def on_ok(self):
+        fld_error = False
+        val_error = False
+        msg = []
         for item in self.node:
-            if (hasattr(self.node[item], 'dtype') and
-                    self.node[item]['dtype'] == 'no-save'):
-                continue
+            if hasattr(self.node[item], 'dtype'):
+                if self.node[item]['dtype'] == 'no-save':
+                    continue
+                elif self.node[item]['dtype'] == 'ipv4':
+                    # npyscreen.notify_confirm(f"{self.fields[item].value}", editw=1)
+                    if not u.is_ipaddr(self.fields[item].value):
+                        fld_error = True
+                        msg += [f'Invalid ipv4 address: {self.fields[item].value}']
+
             if hasattr(self.node[item], 'ftype'):
                 if self.node[item]['ftype'] == 'eth-ifc':
-                    # npyscreen.notify_confirm(f'ifc value: {self.fields[item].value}',
-                    # editw=1)
                     if self.fields[item].value is None:
                         self.node[item]['val'] = None
+                        fld_error = True
+                        msg += ['Missing ethernet interface.']
                     else:
                         self.node[item]['val'] = \
                             self.fields[item].values[self.fields[item].value]
+
+                    # npyscreen.notify_confirm(f'ifc value: {self.fields[item].value}',
+                    #   editw=1)
+
                 elif self.node[item]['ftype'] == 'select-one':
                     self.node[item]['val'] = \
                         self.node[item]['values'][self.fields[item].value[0]]
@@ -448,40 +461,41 @@ class Pup_form(npyscreen.ActionFormV2):
                     self.node[item]['val'] = None
                 else:
                     self.node[item]['val'] = self.fields[item].value
-        msg = ['Validating network profile']
-        if (hasattr(self.node, 'bmc_address_mode')):
-            if (self.node.bmc_address_mode.val == 'dhcp' or
-                    self.node.pxe_ethernet_ifc.val):
-                msg += ['and checking for existing DHCP servers']
-            npyscreen.notify(msg, title='Info')
-            sleep(1)
-        msg = self.parentApp.is_valid_profile(self.node)
-        res = True
-        if msg:
+        if not fld_error:
+            popmsg = ['Validating network profile']
+            if (hasattr(self.node, 'bmc_address_mode')):
+                if (self.node.bmc_address_mode.val == 'dhcp' or
+                        self.node.pxe_ethernet_ifc.val):
+                    popmsg += ['and checking for existing DHCP servers']
+                npyscreen.notify(popmsg, title='Info')
+                sleep(1)
+
+            msg += self.parentApp.is_valid_profile(self.node)
             if 'Error' in msg:
-                npyscreen.notify_confirm(f'{msg}\n Please resolve issues.',
-                                         title='cancel 1', editw=1)
-                # stay on this form
-                self.next_form = self.parentApp.NEXT_ACTIVE_FORM
-                res = False
-            else:
-                msg += ['---------------------',
-                        'Continue with OS install?',
-                        '(No to continue editing the profile data)']
+                val_error = True
 
-                editw = 1 if len(msg) < 10 else 0
-                res = npyscreen.notify_yes_no(msg, title='Profile validation',
-                                              editw=editw)
+            if not fld_error or val_error:
+                res = True
+                if msg:
+                    msg += ['---------------------',
+                            'Continue with OS install?',
+                            '(No to continue editing the profile data)']
 
-        if res:
-            if self.parentApp.NEXT_ACTIVE_FORM == 'MAIN':
-                self.parentApp.prof.update_network_profile(self.node)
-                self.next_form = 'NODE'
-            elif self.parentApp.NEXT_ACTIVE_FORM == 'NODE':
-                self.parentApp.prof.update_node_profile(self.node)
-                self.next_form = None
+                    editw = 1 if len(msg) < 10 else 0
+                    res = npyscreen.notify_yes_no(msg, title='Profile validation',
+                                                  editw=editw)
 
-        else:
+                if res:
+                    if self.parentApp.NEXT_ACTIVE_FORM == 'MAIN':
+                        self.parentApp.prof.update_network_profile(self.node)
+                        self.next_form = 'NODE'
+                    elif self.parentApp.NEXT_ACTIVE_FORM == 'NODE':
+                        self.parentApp.prof.update_node_profile(self.node)
+                        self.next_form = None
+
+        elif fld_error or val_error:
+            msg += ['Please reslove issues.']
+            npyscreen.notify_confirm(msg, title='cancel', editw=1)
             # stay on this form
             self.next_form = self.parentApp.NEXT_ACTIVE_FORM
 
@@ -491,8 +505,9 @@ class Pup_form(npyscreen.ActionFormV2):
         Args:
             mask_prefix (str): Of the form 'ipmask prefix' or ipmask or prefix
         """
+        # npyscreen.notify_confirm(f'mask_prefix: {mask_prefix}', editw=1)
         match1 = re.search(r'(?:.*\s+)*((?:\d{1,3}\.){3}\d{1,3})\s*', mask_prefix)
-        match2 = re.search(r'(?:.*\s+)*(\d{1,2})\s*.*$', mask_prefix)
+        match2 = re.search(r'\s*(\d{1,2})\s*$', mask_prefix)
 
         if match1:
             try:
@@ -501,6 +516,7 @@ class Pup_form(npyscreen.ActionFormV2):
                     mask = match1.group(1)
             except (ValueError, AttributeError, TypeError):
                 mask = None
+
         else:
             mask = None
 
@@ -513,12 +529,15 @@ class Pup_form(npyscreen.ActionFormV2):
         else:
             prefix = None
 
-        msg = ('The entered mask and prefix do not match. The prefix value will be '
-               'used. If you wish to enter just a netmask, a prefix will be calculated. '
-               'If you wish to enter just a prefix, a netmask will be calulated.')
-        if prefix != u.get_prefix(mask):
-            npyscreen.notify_confirm(msg, editw=1)
+        msg = ('The entered mask and prefix do not match. The prefix is given '
+               'precendence. If you wish to enter just a netmask, a prefix will be '
+               'calculated. If you wish to enter just a prefix, a netmask will be '
+               'calulated.')
 
+        tmp = u.get_prefix(mask) if mask else 0
+        if prefix != tmp:
+            npyscreen.notify_confirm(msg, editw=1)
+        # npyscreen.notify_confirm(f'mask: {mask} prefix: {prefix}', editw=1)
         return mask, prefix
 
     def while_editing(self, instance):
@@ -595,7 +614,6 @@ class Pup_form(npyscreen.ActionFormV2):
                     mask = u.get_netmask(prefix)
                 else:
                     prefix = u.get_prefix(mask)
-
                 self.fields[self.prev_field].value = f'{mask} {prefix}'
                 self.display()
 
