@@ -467,9 +467,6 @@ class PowerupAnaRepoFromRepo(PowerupRepo):
         super(PowerupAnaRepoFromRepo, self).__init__(repo_id, repo_name, arch, rhel_ver)
         self.repo_type = 'ana'
 
-    def sync_ana(self, url, rejlist='', acclist=''):
-        """Syncs an Anaconda repository using wget or rsync.
-        """
     def _update_repodata(self, path):
         """ Update the repodata.json file to reflect the actual contents of the
         repodata directory.
@@ -510,6 +507,9 @@ class PowerupAnaRepoFromRepo(PowerupRepo):
 
         return status
 
+    def sync_ana(self, url, rejlist='', acclist=''):
+        """Syncs an Anaconda repository using wget or rsync.
+        """
         def _get_table_row(file_handle):
             """read lines from file handle until end of table row </tr> found
             return:
@@ -573,6 +573,8 @@ class PowerupAnaRepoFromRepo(PowerupRepo):
                 self.log.error('Sync of {self.repo_id} failed. rc: {rc}')
             else:
                 self.log.info(f'{self.repo_name} sync finished successfully')
+
+        self._update_repodata(dest_dir)
 
         # Filter content of index.html
         if '/conda-forge' not in dest_dir:
