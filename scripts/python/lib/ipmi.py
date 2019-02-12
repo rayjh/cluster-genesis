@@ -18,9 +18,13 @@
 from pyghmi import exceptions as pyghmi_exception
 from pyghmi.ipmi import command
 from pyghmi.ipmi.private import session
+import re
 from enum import Enum
+import yaml
+import code
 
 import lib.logger as logger
+import lib.utilities as u
 
 
 def login(host, username, pw, timeout=None):
@@ -41,6 +45,7 @@ def login(host, username, pw, timeout=None):
     session.Session.initting_sessions = {}
     try:
         mysess = command.Command(host, username, pw)
+        #mysess = Ipmi_cmd(host, username, pw)
     except pyghmi_exception.IpmiException as exc:
         log.error(f'Failed IPMI login to BMC {host}')
         log.error(exc)
@@ -65,6 +70,92 @@ def logout(host, user, pw, bmc):
     del bmc.ipmi_session.initialized
     return res
 
+
+def ipmi_fru2dict(fru_str):
+    """Convert the ipmitool fru output to a dictionary. The function first
+        converts the input string to yaml, then yaml load is used to create a
+        dictionary.
+    Args:
+        fru_str (str): Result of running 'ipmitool fru'
+    returns: A dictionary who's keys are the FRUs
+    """
+    yaml_data = []
+    lines = fru_str.splitlines()
+    for i, line in enumerate(lines):
+        # Strip out any excess white space (including tabs) around the ':'
+        line = re.sub(r'\s*:\s*', ': ', line)
+        # Check for blank lines
+        if re.search(r'^\s*$', line):
+            yaml_data.append(line)
+            continue
+        if i < len(lines) - 1:
+            # If indentation is increasing on the following line, then convert the
+            # current line to a dictionary key.
+            indent = re.search(r'[ \t]*', line).span()[1]
+            next_indent = re.search(r'[ \t]*', lines[i + 1]).span()[1]
+            if next_indent > indent:
+                line = re.sub(r'\s*:\s*', ':', line)
+                # if ':' in middle of line take the second half, else
+                # take the beginning
+                if line.split(':')[1]:
+                    line = line.split(':')[1]
+                else:
+                    line = line.split(':')[0]
+                yaml_data.append(line + ':')
+            else:
+                split = line.split(':', 1)
+                # Add quotes around the value to handle non alphanumerics
+                line = split[0] + ': "' + split[1] + '"'
+                yaml_data.append(line)
+    yaml_data = '\n'.join(yaml_data)
+    return yaml.load(yaml_data)
+
+
+def _get_system_sn_pn(ipmi_fru_str):
+    fru_item = _get_system_info(ipmi_fru_str)
+    fru_item = fru_item[list(fru_item.keys())[0]]
+
+    return fru_item['Chassis Serial'].strip(), fru_item['Chassis Part Number'].strip()
+
+
+def _get_system_info(ipmi_fru_str):
+    yaml_dict = ipmi_fru2dict(ipmi_fru_str)
+    fru_item = ''
+    for item in yaml_dict:
+        for srch_item in ['NODE', 'SYS', 'Backplane', 'MP', 'Mainboard']:
+            #code.interact(banner='There', local=dict(globals(), **locals()))
+            if srch_item in item:
+                fru_item = yaml_dict[item]
+                break
+        if fru_item:
+            fru_item = {item: fru_item}
+            break
+    if not fru_item:
+        fru_item = yaml_dict
+        #fru_item = yaml_dict[list(yaml_dict.keys())[0]]
+    return fru_item
+
+
+def get_system_info(host, user, pw):
+    log = logger.getlogger()
+    cmd = f'ipmitool -I lanplus -H {host} -U {user} -P {pw} fru'
+    #code.interact(banner='ipmi.get_system_info', local=dict(globals(), **locals()))
+    res, err, rc = u.sub_proc_exec(cmd, shell=True)
+    if rc == 0:
+        return res
+    else:
+        log.debug(f'Unable to read system information from {host}')
+
+def get_system_sn_pn(host, user, pw):
+    log = logger.getlogger()
+    res = get_system_info(host, user, pw)
+    if not res:
+        return
+    else:
+        #code.interact(banner='ipmi.get_system_sn_pn', local=dict(globals(), **locals()))
+        sys_info = _get_system_info(res)
+        key = list(sys_info.keys())[0]
+        return (sys_info[key]['Chassis Serial'], sys_info[key]['Chassis Part Number'])
 
 def chassisPower(host, op, bmc, timeout=6):
     log = logger.getlogger()

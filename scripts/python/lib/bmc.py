@@ -60,6 +60,18 @@ class Bmc(object):
     def get_host(self):
         return self.host
 
+    def get_system_sn_pn(self, timeout=5):
+        if self.bmc_type == 'openbmc':
+            return open_bmc.get_system_sn_pn(self.host, self.bmc)
+        if self.bmc_type == 'ipmi':
+            return ipmi.get_system_sn_pn(self.host, self.user, self.pw)
+
+    def get_system_info(self, timeout=5):
+        if self.bmc_type == 'openbmc':
+            return open_bmc.get_system_info(self.host, self.bmc)
+        if self.bmc_type == 'ipmi':
+            return ipmi.get_system_info(self.host, self.user, self.pw)
+
     def logout(self):
         if self.bmc_type == 'openbmc':
             return open_bmc.logout(self.host, self.user, self.pw, self.bmc)
