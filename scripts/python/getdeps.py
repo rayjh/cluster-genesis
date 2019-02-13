@@ -21,6 +21,7 @@ import time
 import os.path
 import re
 import code
+import yaml
 
 import lib.logger as logger
 from lib.utilities import Color
@@ -107,7 +108,7 @@ def main():
                 try:
                     fname = repo.replace('/', '')
                     fname = fname.replace('@','')
-                    fname = f'{stage}-{fname}-final.yml'
+                    fname = f'{stage}_{fname}_final.yml'
                     with open(os.path.join(dep_path, fname), 'w') as f:
                         f.write('\n'.join(repo_pkgs) + '\n')
                 except FileNotFoundError as exc:
@@ -154,7 +155,7 @@ def main():
 
             try:
 
-                fname = f'{stage}-final.txt'
+                fname = f'{stage}_final.txt'
                 with open(os.path.join(dep_path, fname), 'w') as f:
                     f.write('\n'.join(pip_pkgs) + '\n')
             except FileNotFoundError as exc:
@@ -193,7 +194,7 @@ def main():
                                               '-' + conda_pkg_items[2] + '.tar.bz2')
                         post_conda_pkg_list.append([conda_pkg_fmt_name,conda_repo])
                 except IndexError:
-                    conda_repo = "pip-pkgs"
+                    conda_repo = "pip_pkgs"
                     conda_pkg_fmt_name = (conda_pkg_items[0] + '==' + conda_pkg_items[1])
                     post_conda_pkg_list.append([conda_pkg_fmt_name,conda_repo])
                 if conda_repo not in conda_repo_list:
@@ -212,7 +213,7 @@ def main():
 
                 try:
                     fname = conda_repo.replace(' ', '')
-                    fname = f'{stage}-{fname}-final.txt'
+                    fname = f'{stage}_{fname}_final.txt'
                     with open(os.path.join(dep_path, fname), 'w') as f:
                         f.write('\n'.join(conda_pkgs) + '\n')
                 except FileNotFoundError as exc:
@@ -231,8 +232,8 @@ def main():
             if fenv != 'client':
 
                 if ffunction == 'pip':
-                    ffname = f'{fenv}_{ffunction}-final.txt'
-                    fcname = f'{ffunction}-consolidated.yml'
+                    ffname = f'{fenv}_{ffunction}_final.txt'
+                    fcname = f'{ffunction}_consolidated.yml'
                     try:
                         with open(os.path.join(dep_path,ffname), 'r') as finput:
                             print (f'\nINFO - Consolidating {ffunction} packages\n')
@@ -245,10 +246,10 @@ def main():
                         pass
 
                 if ffunction == 'conda':
-                    conda_pkgs = ['main', 'free', 'conda-forge', 'conda-pkgs']
+                    conda_pkgs = ['main', 'free', 'conda_forge', 'conda_pkgs']
                     for pkg in conda_pkgs:
-                        ffname = f'{fenv}_{ffunction}-{pkg}-final.txt'
-                        fcname = f'{ffunction}-consolidated.yml'
+                        ffname = f'{fenv}_{ffunction}_{pkg}_final.txt'
+                        fcname = f'{ffunction}_consolidated.yml'
                         try:
                             with open(os.path.join(dep_path,ffname), 'r') as finput:
                                 print ('\nINFO - Consolidating pip packages')
@@ -261,10 +262,10 @@ def main():
                             pass
 
                 if ffunction == 'conda':
-                    conda_pkgs = ['pip-pkgs']
+                    conda_pkgs = ['pip_pkgs']
                     for pkg in conda_pkgs:
-                        ffname = f'{fenv}_{ffunction}-{pkg}-final.txt'
-                        fcname = f'{ffunction}-pip-consolidated.yml'
+                        ffname = f'{fenv}_{ffunction}_{pkg}_final.txt'
+                        fcname = f'{ffunction}_pip_consolidated.yml'
                         try:
                             with open(os.path.join(dep_path,ffname), 'r') as finput:
                                 print ('\nINFO - Consolidating pip packages')
@@ -278,9 +279,9 @@ def main():
     package_merge()
 
     def reslove_duplicates():
-        fclist = ['conda','pip','conda-pip']
+        fclist = ['conda','pip','conda_pip']
         for i in fclist:
-            fcname = f'{i}-consolidated.yml'
+            fcname = f'{i}_consolidated.yml'
             lines_seen = set()
             outfile = open(os.path.join(dep_path,f'{i}.yml'), "w")
             for line in open(os.path.join(dep_path,fcname),"r"):
@@ -288,10 +289,98 @@ def main():
                     outfile.write(f'- {line}')
                     lines_seen.add(line)
         #code.interact(banner='here', local=dict(globals(), **locals()))
-    reslove_duplicates()
+    #reslove_duplicates()
+
+    def pkg_list_format():
+        print("\nINFO - Searching for pkg list template file\n")
+
+        pkg_list_path = gen.GEN_SOFTWARE_PATH
+        pkg_list_name = 'pkg-lists-tmplate.yml'
+        tmp_pkg_list_path = os.path.join(pkg_list_path,f'{pkg_list_name}')
+        try:
+            print(f"\nINFO - Loading {pkg_list_name} data \n")
+            load_tmp = open(f'{tmp_pkg_list_path}')
+            with load_tmp as f:
+                grab = yaml.load(f)
+
+                conda_forge = grab['conda_forge_noarch_pkgs']['accept_list']
+                anaconda_free =  grab['anaconda_free_pkgs']['accept_list']
+                anaconda_main = grab['anaconda_main_pkgs']['accept_list']
+                python3 = grab['python3_specific_pkgs']
+                python = grab['python_pkgs']
+                epel = grab['epel_pkgs']
+                yum = grab['yum_pkgs']
+                cuda = grab['cuda_pkgs']
+
+        except FileNotFoundError as exc:
+                print(f'File not found: {pkg_list_name}. Err: {exc}')
+
+        yum_files = [
+                     'client_yum_anaconda7.5_final.yml',
+                     'client_yum_cuda-powerup_final.yml',
+                     'client_yum_dependencies-powerup_final.yml',
+                     'client_yum_epel-ppc64le-powerup_final.yml',
+                     'client_yum_installed_final.yml',
+                     ]
+
+        for yum_file in yum_files:
+            try:
+                yum_path = dep_path + '/' + yum_file
+                print(f"\nINFO - Loading {yum_file} data \n")
+                load_yum_yml = open(f'{yum_path}')
+                with load_yum_yml as f:
+                    grab_yum = yaml.load(f)
+
+                    base = yum_file.split('_',3)[2]
+
+                    code.interact(banner='yum files', local=dict(globals(), **locals()))
+
+                    if base == 'epel-ppc64le-powerup':
+                        pass
+                        epel = grab['epel_pkgs']
+
+                    elif base == 'cuda-powerup':
+                        pass
+                        cuda = grab['cuda_pkgs']
+
+                    else:
+                        pass
+                        yum = grab['yum_pkgs']
+
+            except FileNotFoundError as exc:
+                    print(f'File not found: {yum_file}. Err: {exc}')
+
+
+        conda_file = 'conda.yml'
+        conda_file_path = dep_path + '/conda.yml'
+        try:
+            print(f"\nINFO - Loading {conda_file} data \n")
+            load_conda_yml = open(f'{conda_file_path}')
+            with load_conda_yml as f:
+                grab_conda = yaml.load(f)
+
+                code.interact(banner='conda file', local=dict(globals(), **locals()))
+
+        except FileNotFoundError as exc:
+                print(f'File not found: {conda_file}. Err: {exc}')
+
+
+        pip_file = 'pip.yml'
+        pip_file_path = dep_path + '/pip.yml'
+        try:
+            print(f"\nINFO - Loading {pip_file} data \n")
+            load_pip_yml = open(f'{pip_file_path}')
+            with load_pip_yml as f:
+                grab_pip = yaml.load(f)
+
+                code.interact(banner='pip files', local=dict(globals(), **locals()))
+
+        except FileNotFoundError as exc:
+                print(f'File not found: {pip_file}. Err: {exc}')
 
 
 
+    pkg_list_format()
 
 if __name__ == '__main__':
     """Simple python template
