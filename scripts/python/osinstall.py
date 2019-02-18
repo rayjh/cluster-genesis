@@ -25,12 +25,14 @@ from orderedattrdict.yamlutils import AttrDictYAMLLoader
 from collections import namedtuple
 from pyroute2 import IPRoute
 import sys
-from time import sleep
+from time import time, sleep
+import code
 
 import lib.logger as logger
 import lib.interfaces as interfaces
 from lib.genesis import get_package_path, get_sample_configs_path
 import lib.utilities as u
+import lib.bmc as _bmc
 
 GEN_PATH = get_package_path()
 GEN_SAMPLE_CONFIGS_PATH = get_sample_configs_path()
@@ -284,6 +286,16 @@ class MyButtonPress(npyscreen.MiniButtonPress):
         if self.name == 'Scan for nodes':
             p = self.parent.parentApp.prof.get_network_profile_tuple()
             nodes = u.scan_subnet(p.bmc_subnet_cidr)
+            self.parent.fields['number_icmp_echo'].value = str(len(nodes))
+
+            ips = []
+            for node in nodes:
+                ips.append(node[0])
+            ips = ' '.join(ips)
+            nodes = u.scan_subnet_for_port_open(ips, 623)
+            #npyscreen.notify_confirm(f'port 623: {len(nodes)}', editw=1)
+            self.parent.fields['number_port_623'].value = str(len(nodes))
+
             self.parent.fields['node_list'].values = nodes
             self.parent.display()
 
@@ -665,7 +677,54 @@ def main(prof_path):
         pro = Profile(prof_path)
         p = pro.get_network_profile_tuple()
         log.debug(p)
-#        n = pro.get_node_profile_tuple()
+        nodes = u.scan_subnet(p.bmc_subnet_cidr)
+        ips = []
+        for node in nodes:
+            ips.append(node[0])
+        ips = ' '.join(ips)
+        #code.interact(banner='osinstall.main1', local=dict(globals(), **locals()))
+        nodes = u.scan_subnet_for_port_open(ips, 623)
+
+        #ips = ' '.join(ips)
+        #for node in nodes:
+        #    ips.append(node[0])
+        #ips = ' '.join(ips)
+
+        n = pro.get_node_profile_tuple()
+        # create dict to hold Bmc class instances
+        bmc = {}
+        code.interact(banner='osinstall.main2', local=dict(globals(), **locals()))
+
+        for ip, mac in nodes:
+            this_bmc = _bmc.Bmc(ip, n.bmc_userid, n.bmc_password, 'ipmi')
+            if this_bmc.is_connected():
+                bmc[ip] = this_bmc
+            else:
+                log.debug('Unable to connect to {node} {n.bmc_userid} {n.bmc_password}')
+
+        code.interact(banner='osinstall.main3', local=dict(globals(), **locals()))
+        # Create dict to hold inventory gathering sub process instances
+        sub_proc_instance = {}
+        # Start a sub process instance to gather inventory for each node.
+        for node in bmc:
+            sub_proc_instance[node] = bmc[node].get_system_inventory_in_background()
+
+        # poll for inventory gathering completion
+        st_time = time()
+        timeout = 15  # seconds
+        sn_pn = {}
+
+        while time() < st_time + timeout and len(sn_pn) < len(bmc):
+            for node in sub_proc_instance:
+                if sub_proc_instance[node].poll() is not None:
+                    if sub_proc_instance[node].poll() == 0 and node not in sn_pn:
+                        inv, stderr = sub_proc_instance[node].communicate()
+                        inv = inv.decode('utf-8')
+                        sn_pn[node] = bmc[node].extract_system_sn_pn(inv)
+        #print(f'poll response for {node}: {inv[node].poll()}')
+
+        code.interact(banner='osinstall.main4', local=dict(globals(), **locals()))
+
 #        res = osi.ifcs.get_interfaces_names()
 #        print(res)
 #        res = osi.ifcs.get_up_interfaces_names('phys')

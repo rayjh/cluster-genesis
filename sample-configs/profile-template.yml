@@ -157,6 +157,19 @@ node:
         ftype: file
         dtype: file-iso
 
+    number_icmp_echo:
+        val:
+        desc: Number ICMP echo
+        help: Number of devices responding to ICMP echo requests
+        floc: skipline
+        dtype: no-save
+
+    number_port_623:
+        val:
+        desc: Number port 623
+        help: Number of devices with port 623 open (IPMI)
+        dtype: no-save
+
     node_list:
         val:
             - 0

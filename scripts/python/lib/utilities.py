@@ -25,6 +25,7 @@ from shutil import copy2
 from subprocess import Popen, PIPE
 from netaddr import IPNetwork, IPAddress, IPSet
 from tabulate import tabulate
+import code
 
 from lib.config import Config
 import lib.logger as logger
@@ -139,15 +140,19 @@ def scan_subnet_for_port_open(cidr, port):
     cmd = f'sudo nmap -p {port} {cidr}'
     res, err, rc = sub_proc_exec(cmd)
     items = []
+    #code.interact(banner='scan subnet for port1', local=dict(globals(), **locals()))
     if rc != 0:
         LOG.error(f'Error while scanning subnet {cidr}, rc: {rc}')
     for line in res.split('Nmap scan report'):
         match = re.search(PATTERN_EMBEDDED_IP, line)
+        #code.interact(banner='scan subnet for port2', local=dict(globals(), **locals()))
         if match:
             ip = match.group(0)
-            match2 = re.search(r'\d+/tcp\s+open', line)
+            match2 = re.search(r'\d+/tcp\s+open.+' + rf'({PATTERN_MAC})', line, re.DOTALL)
             if match2:
-                items.append(ip)
+                mac = match2.group(1)
+                if match2:
+                    items += [(ip, mac)]
     return items
 
 
