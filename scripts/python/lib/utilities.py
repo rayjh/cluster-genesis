@@ -108,6 +108,10 @@ def has_dhcp_servers(interface):
 
 
 def scan_subnet(cidr):
+    """Scans a subnet for responding devices.
+    Args:
+        cidr (str): subnet in cidr format or can be list of ips seperated by spaces
+    """
     cmd = f'sudo nmap -sn {cidr}'
     res, err, rc = sub_proc_exec(cmd)
     items = []
@@ -123,6 +127,27 @@ def scan_subnet(cidr):
             else:
                 mac = ''
             items += [(ip, mac)]
+    return items
+
+
+def scan_subnet_for_port_open(cidr, port):
+    """Scans a subnet for responding devices.
+    Args:
+        cidr (str): subnet in cidr format or can be list of ips seperated by spaces
+        port (str or int) : tcp port to check
+    """
+    cmd = f'sudo nmap -p {port} {cidr}'
+    res, err, rc = sub_proc_exec(cmd)
+    items = []
+    if rc != 0:
+        LOG.error(f'Error while scanning subnet {cidr}, rc: {rc}')
+    for line in res.split('Nmap scan report'):
+        match = re.search(PATTERN_EMBEDDED_IP, line)
+        if match:
+            ip = match.group(0)
+            match2 = re.search(r'\d+/tcp\s+open', line)
+            if match2:
+                items.append(ip)
     return items
 
 
