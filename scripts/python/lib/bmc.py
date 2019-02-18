@@ -60,6 +60,18 @@ class Bmc(object):
     def get_host(self):
         return self.host
 
+    def get_system_pn_sn(self, timeout=5):
+        if self.bmc_type == 'openbmc':
+            return open_bmc.get_system_pn_sn(self.host, self.bmc)
+        if self.bmc_type == 'ipmi':
+            return ipmi.get_system_pn_sn(self.host, self.bmc)
+
+    def get_system_info(self, timeout=5):
+        if self.bmc_type == 'openbmc':
+            return open_bmc.get_system_info(self.host, self.bmc)
+        if self.bmc_type == 'ipmi':
+            return ipmi.get_system_info(self.host, self.bmc)
+
     def logout(self):
         if self.bmc_type == 'openbmc':
             return open_bmc.logout(self.host, self.user, self.pw, self.bmc)
@@ -98,13 +110,12 @@ class Bmc(object):
 
 
 if __name__ == '__main__':
-    """Show status of the Cluster Genesis environment
+    """Establish a connection to a BMC and allow communication
     Args:
-        INV_FILE (string): Inventory file.
-        LOG_LEVEL (string): Log level.
-
-    Raises:
-       Exception: If parameter count is invalid.
+        host (string): BMC host ip address.
+        user (string): User id.
+        pw (strint): User password
+        bmc_type (string): 'open' for openBMC or 'ipmi'
     """
 
     logger.create('debug', 'debug')
@@ -153,6 +164,7 @@ if __name__ == '__main__':
         if args.bmc_type in ('open', 'ipmi'):
             bmc_status = bmc.bmc_status()
             print(f'BMC status: {bmc_status}')
+            bmc_pn_sn = bmc.get_system_pn_sn()
             # print('Rebooting bmc')
             # r = bmc.bmc_reset('cold')
             # print(f'BMC response: {r}')
@@ -181,16 +193,16 @@ if __name__ == '__main__':
             # print('clossing BMC connection')
             # bmc.logout()
 
-        print('Attempting to log back into BMC')
-        while True:
-            bmc = Bmc(args.host, args.user, args.pw, args.bmc_type)
-            if bmc.is_connected():
-                print(f'\nsuccessfully logged back into {args.host}')
-                break
-            else:
-                print('Failed login attempt')
-                time.sleep(3)
-    else:
-        log.error('Failed to instantiate the bmc class')
+#        print('Attempting to log back into BMC')
+#        while True:
+#            bmc = Bmc(args.host, args.user, args.pw, args.bmc_type)
+#            if bmc.is_connected():
+#                print(f'\nsuccessfully logged back into {args.host}')
+#                break
+#            else:
+#                print('Failed login attempt')
+#                time.sleep(3)
+#    else:
+#        log.error('Failed to instantiate the bmc class')
 
     print('done')
