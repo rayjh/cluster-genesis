@@ -66,7 +66,7 @@ class software(object):
         self.state = {'EPEL Repository': '-',
                       'CUDA Driver Repository': '-',
                       'IBM AI Repository': '-',
-                      'PowerAIE license content': '-',
+                      'WMLA license content': '-',
                       'Dependent Packages Repository': '-',
                       'Python Package Repository': '-',
                       'Anaconda content': '-',
@@ -567,13 +567,13 @@ class software(object):
                     self.sw_vars[f'{vars_key}-alt-url'] = _url
 
                 # accept_list is used for linux-ppc64le, reject_list for noarch
-                if 'accept_list' in self.pkgs['ibm-ai-conda-linux-ppc64le']:
-                    al = self.pkgs['ibm-ai-conda-linux-ppc64le']['accept_list']
+                if 'accept_list' in self.pkgs['ibm_ai_conda_linux_ppc64le']:
+                    al = self.pkgs['ibm_ai_conda_linux_ppc64le']['accept_list']
                 else:
                     al = None
 
-                if 'reject_list' in self.pkgs['ibm-ai-conda-linux-ppc64le']:
-                    rl = self.pkgs['ibm-ai-conda-linux-ppc64le']['reject_list']
+                if 'reject_list' in self.pkgs['ibm_ai_conda_linux_ppc64le']:
+                    rl = self.pkgs['ibm_ai_conda_linux_ppc64le']['reject_list']
                 else:
                     rl = None
 
@@ -587,13 +587,13 @@ class software(object):
                 if channel not in self.sw_vars['ana_powerup_repo_channels']:
                     self.sw_vars['ana_powerup_repo_channels'].append(channel)
 
-                if 'accept_list' in self.pkgs['ibm-ai-conda-noarch']:
-                    al = self.pkgs['ibm-ai-conda-noarch']['accept_list']
+                if 'accept_list' in self.pkgs['ibm_ai_conda_noarch']:
+                    al = self.pkgs['ibm_ai_conda_noarch']['accept_list']
                 else:
                     al = None
 
-                if 'reject_list' in self.pkgs['ibm-ai-conda-noarch']:
-                    rl = self.pkgs['ibm-ai-conda-noarch']['reject_list']
+                if 'reject_list' in self.pkgs['ibm_ai_conda_noarch']:
+                    rl = self.pkgs['ibm_ai_conda_noarch']['reject_list']
                 else:
                     rl = None
                 noarch_url = os.path.split(url.rstrip('/'))[0] + '/noarch/'
@@ -601,7 +601,7 @@ class software(object):
                 repo.sync_ana(noarch_url, acclist=al, rejlist=rl)
 
         # Get PowerAI Enterprise license file
-        name = 'PowerAIE license content'
+        name = 'WMLA license content'
         heading1(f'Set up {name.title()} \n')
         lic_src = self.globs[name]
         exists = self.status_prep(name)
@@ -752,7 +752,7 @@ class software(object):
                 # directories
                 src_path = '/home/**/cuda-repo-rhel7-10-1-local-*.rpm'
             rpm_path = repo.get_rpm_path(src_path)
-            code.interact(banner='here', local=dict(globals(), **locals()))
+            #code.interact(banner='here', local=dict(globals(), **locals()))
             if rpm_path:
                 self.sw_vars[f'{repo_id}_src_rpm_dir'] = rpm_path
                 repo_dir = repo.extract_rpm(rpm_path)
@@ -795,7 +795,7 @@ class software(object):
             print(f'{repo_name} repository not updated')
         if ch != 'S':
             repo_dir += '/cuda-drivers-[4-9][0-9][0-9].[0-9]*-[0-9]*'
-            code.interact(banner='There', local=dict(globals(), **locals()))
+            #code.interact(banner='There', local=dict(globals(), **locals()))
             files = glob.glob(repo_dir, recursive=True)
             if files:
                 self.sw_vars['cuda-driver'] = re.search(r'cuda-drivers-\d+\.\d+-\d+',
