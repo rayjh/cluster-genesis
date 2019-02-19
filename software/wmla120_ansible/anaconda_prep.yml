@@ -15,6 +15,6 @@
     owner: "{{ ansible_user_id }}"
     group: "{{ ansible_user_id }}"
     mode: 0744
-    checksum: md5:ee13966b6528f0398a8216f394539255
+    checksum: md5:c33b5c310959a0a49b9afb91a76159c6
     url: "http://{{ host_ip.stdout }}/{{ file }}"
     dest: "{{ ansible_env.HOME }}"

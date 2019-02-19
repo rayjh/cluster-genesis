@@ -10,9 +10,9 @@
   delegate_to: localhost
   register: host_ip
 
-- name: Install NCCL1 from the PowerAI repository
+- name: Install openssh-client
   yum:
-    name: libnccl*
+    name: openssh-clients
     state: latest
   become: yes
 
@@ -27,6 +27,14 @@
   when: not conda_dlipy3_env.stat.exists
   become: yes
 
+- name: Install frameworks
+  shell: "{{ install_dir }}/bin/conda install --yes {{ item }} powerai=1.6 -n dlipy3"
+  loop:
+    - "tensorflow"
+    - "caffe"
+    - "pytorch"
+  become: yes
+
 - name: Activate dlipy3 environment and install dependencies
   shell: "source {{ install_dir }}/bin/activate dlipy3 && {{ item }}"
   loop:
@@ -38,16 +46,22 @@
       redis-py==2.10.5 chardet==3.0.4 flask==1.0.2 psutil==5.5.0"
     - "{{ install_dir }}/bin/conda install --yes --no-update-dependencies \
       python-gflags==3.1.2 pandas==0.20.3 pyzmq==16.0.3"
-    - "pip install --index-url http://{{ host_ip.stdout }}/repos/pypi/simple \
-      ipaddress==1.0.22 configparser==3.5.0 easydict==1.9 --trusted-host \
-      {{ host_ip.stdout }}"
+    - "pip install ipaddress==1.0.22 configparser==3.5.0 easydict==1.9"
+#    - "pip install --index-url http://{{ host_ip.stdout }}/repos/pypi/simple \
+#      ipaddress==1.0.22 configparser==3.5.0 easydict==1.9 --trusted-host \
+#      {{ host_ip.stdout }}"
   become: yes
 
 - name: Install additional packages for large model support
-  shell: "source {{ install_dir }}/bin/activate dlipy3 && pip install \
-         --index-url http://{{ host_ip.stdout }}/repos/pypi/simple \
-         hanziconv==0.3.2 gensim==3.6.0 --trusted-host {{ host_ip.stdout }}"
+  shell: "source {{ install_dir }}/bin/activate dlipy3 && \
+         pip install hanziconv==0.3.2 gensim==3.6.0"
   become: yes
+
+#- name: Install additional packages for large model support
+#  shell: "source {{ install_dir }}/bin/activate dlipy3 && pip install \
+#         --index-url http://{{ host_ip.stdout }}/repos/pypi/simple \
+#         hanziconv==0.3.2 gensim==3.6.0 --trusted-host {{ host_ip.stdout }}"
+#  become: yes
 
 - name: Check if Anaconda dlipy2 environment already exists
   stat:
@@ -58,6 +72,14 @@
          Spectrum Conductor Deep Learning Impact"
   shell: "{{ install_dir }}/bin/conda create --name dlipy2 --yes pip python=2.7"
   when: not conda_dlipy2_env.stat.exists
+  become: yes
+
+- name: Install frameworks
+  shell: "{{ install_dir }}/bin/conda install --yes {{ item }} powerai=1.6 -n dlipy2"
+  loop:
+    - "tensorflow"
+    - "caffe"
+    - "pytorch"
   become: yes
 
 - name: Activate dlipy2 environment and install dependencies
@@ -71,15 +93,12 @@
       redis-py==2.10.5 chardet==3.0.4 flask==1.0.2 psutil==5.5.0"
     - "{{ install_dir }}/bin/conda install --yes --no-update-dependencies \
       python-gflags==3.1.2 pandas==0.20.3 pyzmq==16.0.3"
-    - "pip install --index-url http://{{ host_ip.stdout }}/repos/pypi/simple \
-      ipaddress==1.0.22 configparser==3.5.0 easydict==1.9 --trusted-host \
-      {{ host_ip.stdout }}"
+    - "pip install ipaddress==1.0.22 configparser==3.5.0 easydict==1.9"
   become: yes
 
 - name: Install additional packages for large model support
-  shell: "source {{ install_dir }}/bin/activate dlipy2 && pip install \
-         --index-url http://{{ host_ip.stdout }}/repos/pypi/simple \
-         hanziconv==0.3.2 gensim==3.6.0 --trusted-host {{ host_ip.stdout }}"
+  shell: "source {{ install_dir }}/bin/activate dlipy2 && \
+         pip install hanziconv==0.3.2 gensim==3.6.0"
   become: yes
 
 - name: Install elastic distributed training dependencies
@@ -125,17 +144,13 @@
 - name: Activate dlinsights and install dependencies
   shell: "source {{ install_dir }}/bin/activate dlinsights && {{ item }}"
   loop:
-    - "pip install --retries 1 --timeout 5 \
-      --index-url http://{{ host_ip.stdout }}/repos/pypi/simple \
-      numpy==1.12.1 --trusted-host {{ host_ip.stdout }}"
+    - "pip install numpy==1.12.1"
     - "{{ install_dir }}/bin/conda install --yes --no-update-dependencies \
       pyopenssl==18.0.0"
-    - "pip install --retries 1 --timeout 5 --no-cache-dir \
-      --index-url http://{{ host_ip.stdout }}/repos/pypi/simple \
+    - "pip install --no-cache-dir \
       requests==2.18.0 elasticsearch==5.2.0 Flask==0.12.2 Flask-Cors==3.0.3 \
       Flask-Script==2.0.5 Flask-HTTPAuth==3.2.2 mongoengine==0.11.0 \
       pathlib==1.0.1 python-heatclient==1.2.0 \
       SQLAlchemy==1.1.13 scipy==1.0.1 alembic==0.8.2 \
-      python-keystoneclient==3.17.0 \
-      --trusted-host {{ host_ip.stdout }}"
+      python-keystoneclient==3.17.0"
   become: yes
