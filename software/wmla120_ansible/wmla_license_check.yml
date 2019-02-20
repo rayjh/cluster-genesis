@@ -1,0 +1,4 @@
+---
+- name: Check WMLA license
+  shell: /opt/DL/powerai-enterprise/license/bin/check-wmla-license.sh
+  become: yes

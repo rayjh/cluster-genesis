@@ -198,7 +198,6 @@ class software(object):
             else:
                 self.globs = file_lists['globs']
                 self.files = file_lists['files']
-
         # If empty, initialize software_vars content and repo info
         # from software server directory
         update = False
@@ -798,7 +797,7 @@ class software(object):
             #code.interact(banner='There', local=dict(globals(), **locals()))
             files = glob.glob(repo_dir, recursive=True)
             if files:
-                self.sw_vars['cuda-driver'] = re.search(r'cuda-drivers-\d+\.\d+-\d+',
+                self.sw_vars['cuda-drivers'] = re.search(r'cuda-drivers-\d+\.\d+-\d+',
                                                         ' '.join(files)).group(0)
             else:
                 self.log.error('No cuda toolkit file found in cuda repository')
@@ -1559,8 +1558,8 @@ class software(object):
                     self.sw_vars['ansible_inventory'],
                     self.sw_vars['content_files']['anaconda'])
             elif (task['description'] ==
-                    "Check PowerAI Enterprise License acceptance"):
-                _interactive_paie_license_accept(
+                    "Check WMLA License acceptance"):
+                _interactive_wmla_license_accept(
                     self.sw_vars['ansible_inventory'])
             extra_args = ''
             if 'hosts' in task:
@@ -1665,21 +1664,21 @@ def _interactive_anaconda_license_accept(ansible_inventory, ana_path):
     return rc
 
 
-def _interactive_paie_license_accept(ansible_inventory):
+def _interactive_wmla_license_accept(ansible_inventory):
     log = logger.getlogger()
 
     cmd = (f'ansible-inventory --inventory {ansible_inventory} --list')
     resp, err, rc = sub_proc_exec(cmd, shell=True)
     inv = json.loads(resp)
 
-    accept_cmd = ('sudo /opt/DL/powerai-enterprise/license/bin/'
-                  'accept-powerai-enterprise-license.sh ')
-    check_cmd = ('/opt/DL/powerai-enterprise/license/bin/'
-                 'check-powerai-enterprise-license.sh ')
+    accept_cmd = ('sudo /opt/anaconda3/bin/'
+                  'accept-ibm-wmla-license.sh ')
+    #check_cmd = ('/opt/DL/powerai-enterprise/license/bin/'
+    #             'check-powerai-enterprise-license.sh ')
 
-    print(bold('Acceptance of the PowerAI Enterprise license is required on '
+    print(bold('Acceptance of the WMLA Enterprise license is required on '
                'all nodes in the cluster.'))
-    rlinput(f'Press Enter to run interactively on each hosts')
+    rlinput(f'Press Enter to run interactively on each host')
 
     for hostname, hostvars in inv['_meta']['hostvars'].items():
         base_cmd = f'ssh -t {hostvars["ansible_user"]}@{hostname} '
@@ -1691,12 +1690,12 @@ def _interactive_paie_license_accept(ansible_inventory):
         cmd = base_cmd + check_cmd
         resp, err, rc = sub_proc_exec(cmd)
         if rc == 0:
-            print(bold('PowerAI Enterprise license already accepted on '
+            print(bold('WMLA Enterprise license already accepted on '
                        f'{hostname}'))
         else:
             run = True
             while run:
-                print(bold('\nRunning PowerAI Enterprise license script on '
+                print(bold('\nRunning WMLA Enterprise license script on '
                            f'{hostname}'))
                 cmd = base_cmd + accept_cmd
                 rc = sub_proc_display(cmd)

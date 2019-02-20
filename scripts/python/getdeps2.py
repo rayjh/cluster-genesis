@@ -71,13 +71,24 @@ def main():
                             pkg_items[1] + '.' + pkg_items[0].rsplit('.', 1)[1])
 
         elif pkg_type == 'conda':
-            pkg_items = pkg.split() + ['pip']
-            pkg_repo = pkg_items[3].rsplit('/')[-1]
-            if pkg_repo == 'pip':
-                pkg_fmt_name = pkg_items[0] + '=' + pkg_items[1]
-            else:
-                pkg_fmt_name = (pkg_items[0] + '-' +
-                                pkg_items[1] + '-' + pkg_items[2] + '.tar.bz2')
+            pkg_fmt_name = pkg.rpartition('/')[-1]
+            if '/linux-ppc64le' in pkg:
+                pkg_repo = pkg[:pkg.find('/linux-ppc64le')]
+            elif '/linux-64' in pkg:
+                pkg_repo = pkg[:pkg.find('/linux-64')]
+            elif '/noarch' in pkg:
+                pkg_repo = pkg[:pkg.find('/noarch')]
+            elif 'file://' in pkg:
+                pkg_repo = '/file'
+            pkg_repo = pkg_repo.rpartition('/')[-1]
+
+            #pkg_items = pkg.split() + ['pip']
+            #pkg_repo = pkg_items[3].rsplit('/')[-1]
+            #if pkg_repo == 'pip':
+            #    pkg_fmt_name = pkg_items[0] + '=' + pkg_items[1]
+            #else:
+            #    pkg_fmt_name = (pkg_items[0] + '-' +
+            #                    pkg_items[1] + '-' + pkg_items[2] + '.tar.bz2')
             #code.interact(banner='format conda', local=dict(globals(), **locals()))
 
 
@@ -101,6 +112,7 @@ def main():
             for repo in merged_sets:
                 file_name = f'{pkg_type}-{repo}.yml'
                 file_path = os.path.join(dep_path, file_name)
+                #code.interact(banner='write conda', local=dict(globals(), **locals()))
                 with open(file_path, 'w') as f:
                     d = {file_name: sorted(list(merged_sets[repo]))}
                     yaml.dump(d, f, indent=4, default_flow_style=False)
@@ -120,8 +132,19 @@ def main():
         if pkg_type == 'conda':
             for pkg in pkgs:
                 #code.interact(banner='get repo list', local=dict(globals(), **locals()))
-                pkg_items = pkg.split()  + ['pip']
-                repo = pkg_items[3].rsplit('/')[-1]
+                #pkg_items = pkg.split()  + ['pip']
+                #repo = pkg_items[3].rsplit('/')[-1]
+
+                #repo = pkg.rpartition('/')[0]  # strip filename
+                #repo = repo[2 + repo.find('//'):]  # strip leading 'http://' & similar
+                if '/linux-ppc64le' in pkg:
+                    repo = pkg[:pkg.find('/linux-ppc64le')]
+                elif '/linux-64' in pkg:
+                    repo = pkg[:pkg.find('/linux-64')]
+                else:
+                    repo = pkg[:pkg.find('/noarch')]
+                repo = repo.rpartition('/')[-1]
+
                 if repo not in repo_list:
                     repo_list.append(repo)
 
@@ -190,6 +213,7 @@ def main():
 
         # Post - pre pkg sets. (may need adjustment for different repo type)
         for _file in pkgs:
+            #code.interact(banner='diff', local=dict(globals(), **locals()))
             diff_sets[_file] = {}
             for repo in pkgs[_file]:
                 #code.interact(banner='diff loop', local=dict(globals(), **locals()))
