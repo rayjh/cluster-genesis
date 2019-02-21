@@ -3,6 +3,7 @@
   yum:
     name: "{{ item }}"
     state: latest
+# may need to inckude kernel-devel
   with_items:
     - kernel
     - kernel-tools
