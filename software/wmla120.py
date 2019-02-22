@@ -33,7 +33,7 @@ from getpass import getpass
 import pwd
 import grp
 import click
-import code
+#import code
 
 import lib.logger as logger
 from repos import PowerupRepo, PowerupRepoFromDir, PowerupYumRepoFromRepo, \
@@ -73,7 +73,7 @@ class software(object):
                       'Anaconda content': '-',
                       'Anaconda Free Repository': '-',
                       'Anaconda Main Repository': '-',
-                      'Conda-forge Repository': '-',
+                      #'Conda-forge Repository': '-',
                       'Spectrum conductor content': '-',
                       'Spectrum conductor content entitlement': '-',
                       'Spectrum DLI content': '-',
@@ -83,7 +83,8 @@ class software(object):
         # Only yum repos should be listed under self.repo_id
         self.repo_id = {'EPEL Repository': 'epel-ppc64le',
                         'Dependent Packages Repository': 'dependencies',
-                        'Python Package Repository': 'pypi'}
+                        'Python Package Repository': 'pypi',
+                        'CUDA Driver Repository': 'cuda'}
 
         try:
             self.pkgs = yaml.load(open(GEN_SOFTWARE_PATH +
@@ -1041,43 +1042,43 @@ class software(object):
                 rl = self.pkgs['anaconda_main_noarch']['reject_list']
                 repo.sync_ana(noarch_url, acclist=al, rejlist=rl)
 
-        # Setup Anaconda conda-forge Repo.  (not a YUM repo)
-        repo_id = 'anaconda'
-        repo_name = 'Conda-forge noarch Repository'
-        baseurl = 'https://conda.anaconda.org/conda-forge/noarch/'
-        heading1(f'Set up {repo_name}\n')
-
-        vars_key = get_name_dir(repo_name)  # format the name
-        if f'{vars_key}-alt-url' in self.sw_vars:
-            alt_url = self.sw_vars[f'{vars_key}-alt-url']
-        else:
-            alt_url = None
-
-        exists = self.status_prep(which='Conda-forge Repository')
-        if exists:
-            self.log.info('The Conda-forge Repository exists already'
-                          ' in the POWER-Up server\n')
-
-        repo = PowerupAnaRepoFromRepo(repo_id, repo_name)
-
-        ch = repo.get_action(exists)
-        if ch in 'Y':
-            url = repo.get_repo_url(baseurl, alt_url, contains=['noarch'],
-                                    excludes=['main'],
-                                    filelist=['configparser-3.5*'])
-            if url:
-                if not url == baseurl:
-                    self.sw_vars[f'{vars_key}-alt-url'] = url
-
-                al = self.pkgs['conda_forge_noarch_pkgs']['accept_list']
-
-                dest_dir = repo.sync_ana(url, acclist=al)
-                dest_dir = dest_dir[4 + dest_dir.find('/srv'):7 + dest_dir.find('noarch')]
-                # form .condarc channel entry. Note that conda adds
-                # the corresponding 'noarch' channel automatically.
-                channel = f'  - http://{{{{ host_ip.stdout }}}}{dest_dir}'
-                if channel not in self.sw_vars['ana_powerup_repo_channels']:
-                    self.sw_vars['ana_powerup_repo_channels'].insert(0, channel)
+#        # Setup Anaconda conda-forge Repo.  (not a YUM repo)
+#        repo_id = 'anaconda'
+#        repo_name = 'Conda-forge noarch Repository'
+#        baseurl = 'https://conda.anaconda.org/conda-forge/noarch/'
+#        heading1(f'Set up {repo_name}\n')
+#
+#        vars_key = get_name_dir(repo_name)  # format the name
+#        if f'{vars_key}-alt-url' in self.sw_vars:
+#            alt_url = self.sw_vars[f'{vars_key}-alt-url']
+#        else:
+#            alt_url = None
+#
+#        exists = self.status_prep(which='Conda-forge Repository')
+#        if exists:
+#            self.log.info('The Conda-forge Repository exists already'
+#                          ' in the POWER-Up server\n')
+#
+#        repo = PowerupAnaRepoFromRepo(repo_id, repo_name)
+#
+#        ch = repo.get_action(exists)
+#        if ch in 'Y':
+#            url = repo.get_repo_url(baseurl, alt_url, contains=['noarch'],
+#                                    excludes=['main'],
+#                                    filelist=['configparser-3.5*'])
+#            if url:
+#                if not url == baseurl:
+#                    self.sw_vars[f'{vars_key}-alt-url'] = url
+#
+#                al = self.pkgs['conda_forge_noarch_pkgs']['accept_list']
+#
+#                dest_dir = repo.sync_ana(url, acclist=al)
+#                dest_dir = dest_dir[4 + dest_dir.find('/srv'):7 + dest_dir.find('noarch')]
+#                # form .condarc channel entry. Note that conda adds
+#                # the corresponding 'noarch' channel automatically.
+#                channel = f'  - http://{{{{ host_ip.stdout }}}}{dest_dir}'
+#                if channel not in self.sw_vars['ana_powerup_repo_channels']:
+#                    self.sw_vars['ana_powerup_repo_channels'].insert(0, channel)
 
         # Setup Python package repository. (pypi)
         repo_id = 'pypi'
