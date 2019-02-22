@@ -46,9 +46,9 @@
   tasks: entitle_spectrum_conductor_dli.yml
   hosts: master[0]
 
-- description: Provide permission for DLI cluster admin to write audit directory
-  tasks: permit_dli_admin_write_audit.yml
-  hosts: master[0]
+#- description: Provide permission for DLI cluster admin to write audit directory
+#  tasks: permit_dli_admin_write_audit.yml
+#  hosts: master[0]
 
 - description: Add all hosts to cluster
   tasks: add_hosts_to_cluster.yml

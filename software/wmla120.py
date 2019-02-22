@@ -59,8 +59,9 @@ class software(object):
         self.yum_powerup_repo_files = []
         self.eval_ver = eval_ver
         self.non_int = non_int
+        self.eng_mode = None
         # self.eng_mode = 'custom-repo'
-        self.eng_mode = 'gather-dependencies'
+        # self.eng_mode = 'gather-dependencies'
         yaml.add_constructor(YAMLVault.yaml_tag, YAMLVault.from_yaml)
 
         self.state = {'EPEL Repository': '-',
