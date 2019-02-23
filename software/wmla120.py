@@ -33,7 +33,7 @@ from getpass import getpass
 import pwd
 import grp
 import click
-#import code
+import code
 
 import lib.logger as logger
 from repos import PowerupRepo, PowerupRepoFromDir, PowerupYumRepoFromRepo, \
@@ -53,12 +53,16 @@ class software(object):
     initialization activities. The install method implements the actual
     installation.
     """
-    def __init__(self, eval_ver=False, non_int=False):
+    def __init__(self, eval_ver=False, non_int=False, arch='ppc64le', proc_family=''):
         self.log = logger.getlogger()
         self.my_name = sys.modules[__name__].__name__
         self.yum_powerup_repo_files = []
         self.eval_ver = eval_ver
         self.non_int = non_int
+        self.arch = arch
+        self.proc_family = proc_family
+        if self.arch == 'x86_64' and not proc_family:
+            self.proc_family = self.arch
         self.eng_mode = None
         # self.eng_mode = 'custom-repo'
         # self.eng_mode = 'gather-dependencies'
@@ -175,11 +179,10 @@ class software(object):
         self.sw_vars['epel_repo_name'] = self.epel_repo_name
         self.rhel_ver = '7'
         self.sw_vars['rhel_ver'] = self.rhel_ver
-        self.arch = 'ppc64le'
         self.sw_vars['arch'] = self.arch
-        self.root_dir = '/srv/'
-        self.repo_dir = self.root_dir + 'repos/{repo_id}/rhel' + self.rhel_ver + \
-            '/{repo_id}'
+        self.root_dir = '/srv'
+        #self.repo_dir = self.root_dir + 'repos/{repo_id}/rhel' + self.rhel_ver + \
+        #    '/{repo_id}'
 
         # When searching for files in other web servers, the fileglobs are converted to
         # regular expressions. An asterisk (*) after a bracket is converted to a
@@ -284,8 +287,8 @@ class software(object):
     def status_prep(self, which='all'):
 
         def yum_repo_status(item):
-            repodata = glob.glob(self.repo_dir.format(repo_id=self.repo_id[item]) +
-                                 '/**/repodata', recursive=True)
+            search_dir = f'{self.root_dir}/repos/{self.repo_id[item]}/**/repodata'
+            repodata = glob.glob(search_dir, recursive=True)
             sw_vars_data = (f'{self.repo_id[item]}-powerup.repo' in
                             self.sw_vars['yum_powerup_repo_files'])
             if repodata and sw_vars_data:
@@ -812,28 +815,9 @@ class software(object):
         repo_id = 'dependencies'
         repo_name = 'Dependencies'
         baseurl = ''
+
         heading1(f'Set up {repo_name} repository')
-        # list to str
-        dep_list = ' '.join(self.pkgs['yum_pkgs'])
 
-        file_more = GEN_SOFTWARE_PATH + 'dependent-packages.list'
-        if os.path.isfile(file_more):
-            try:
-                with open(file_more, 'r') as f:
-                    more = f.read()
-            except:
-                self.log.error('Error reading {file_more}')
-                more = ''
-            else:
-                more.replace(',', ' ')
-                more.replace('\n', ' ')
-        else:
-            more = ''
-
-        if f'{repo_id}_alt_url' in self.sw_vars:
-            alt_url = self.sw_vars[f'{repo_id}_alt_url']
-        else:
-            alt_url = None
 
         exists = self.status_prep(which='Dependent Packages Repository')
         if exists:
@@ -847,6 +831,39 @@ class software(object):
 
         ch = 'S'
         if get_yesno(prompt=pr_str, yesno='Y/n'):
+
+
+            if self.arch == 'ppc64le' and not self.proc_family:
+                self.proc_family, item = get_selection('Power 8\nPower 9', 'p8\np9',
+                                                'Processor family? ')
+
+            if self.proc_family == 'p9':
+                dep_list = ' '.join(self.pkgs['yum_pkgs_p9'])
+            elif self.proc_family == 'p8':
+                dep_list = ' '.join(self.pkgs['yum_pkgs_p8'])
+            elif self.arch == 'x86_64':
+                dep_list = ' '.join(self.pkgs['yum_pkgs_x86_64'])
+
+            file_more = GEN_SOFTWARE_PATH + 'dependent-packages.list'
+            if os.path.isfile(file_more):
+                try:
+                    with open(file_more, 'r') as f:
+                        more = f.read()
+                except:
+                    self.log.error('Error reading {file_more}')
+                    more = ''
+                else:
+                    more.replace(',', ' ')
+                    more.replace('\n', ' ')
+            else:
+                more = ''
+
+            if f'{repo_id}_alt_url' in self.sw_vars:
+                alt_url = self.sw_vars[f'{repo_id}_alt_url']
+            else:
+                alt_url = None
+
+
             if platform.machine() == self.arch:
                 ch, item = get_selection('Sync required dependent packages from '
                                          'Enabled YUM repos\n'
@@ -863,7 +880,7 @@ class software(object):
                                          'Repository source? ')
 
         if ch == 'E':
-            repo = PowerupRepo(repo_id, repo_name)
+            repo = PowerupRepo(repo_id, repo_name, proc_family=self.proc_family)
             repo_dir = repo.get_repo_dir()
             self._add_dependent_packages(repo_dir, dep_list)
             self._add_dependent_packages(repo_dir, more)
@@ -875,7 +892,7 @@ class software(object):
             self.sw_vars['yum_powerup_repo_files'][filename] = content
 
         elif ch == 'D':
-            repo = PowerupRepoFromDir(repo_id, repo_name)
+            repo = PowerupRepoFromDir(repo_id, repo_name, proc_family=self.proc_family)
 
             if f'{repo_id}_src_dir' in self.sw_vars:
                 src_dir = self.sw_vars[f'{repo_id}_src_dir']
@@ -897,7 +914,8 @@ class software(object):
             else:
                 alt_url = None
 
-            repo = PowerupYumRepoFromRepo(repo_id, repo_name)
+            repo = PowerupYumRepoFromRepo(repo_id, repo_name,
+                                          proc_family=self.proc_family)
 
             url = repo.get_repo_url(baseurl, alt_url, contains=[repo_id],
                                     filelist=['bzip2-*'])
