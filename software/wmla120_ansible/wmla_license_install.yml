@@ -22,7 +22,9 @@
     url: "http://{{ host_ip.stdout }}/wmla-license/{{ file }}"
     dest: "{{ ansible_env.HOME }}"
 
-# wmla license installs to /opt/anaconda3/bin/ (accept-ibm-wmla-license.sh)
+# wmla license acceptance script installs to /opt/anaconda3/bin/
+# # (accept-ibm-wmla-license.sh) Interactive license acceptance across the cluster
+# is orchestrated by the software install python module
 - name: Install wmla license
   shell: "{{ install_dir }}/bin/conda install --yes --use-local file:/{{ ansible_env.HOME }}/{{ file }}"
   become: yes

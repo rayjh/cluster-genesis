@@ -26,8 +26,9 @@
 - description: Install WMLA License Script
   tasks: wmla_license_install.yml
 
-- description: Check WMLA License acceptance
-  tasks: wmla_license_check.yml
+- description: Check WMLA License acceptance and install to root
+  tasks: wmla_license_check_and_install_to_root.yml
+ #tasks: wmla_license_check.yml
 
 - description: Configure a system for IBM Spectrum Conductor Deep Learning Impact
   tasks: configure_spectrum_conductor.yml

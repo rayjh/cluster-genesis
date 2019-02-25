@@ -217,8 +217,8 @@ def main():
             diff_sets[_file] = {}
             for repo in pkgs[_file]:
                 #code.interact(banner='diff loop', local=dict(globals(), **locals()))
-                post_minus_pre = (set(pkgs[_file][repo]['post']) -
-                                  set(pkgs[_file][repo]['pre']))
+                post_minus_pre = set(pkgs[_file][repo]['post'])  #-
+                                  #set(pkgs[_file][repo]['pre']))
                 diff_sets[_file][repo] = post_minus_pre
 
         #code.interact(banner='post diff', local=dict(globals(), **locals()))
@@ -237,8 +237,8 @@ def main():
 
         write_merged_files(merged_sets, pkg_type)
 
-    merge_function(yum_pre_files, yum_post_files, 'yum')
-    #merge_function(conda_pre_files, conda_post_files, 'conda')
+    #merge_function(yum_pre_files, yum_post_files, 'yum')
+    merge_function(conda_pre_files, conda_post_files, 'conda')
 
 
 ##pip

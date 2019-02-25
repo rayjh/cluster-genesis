@@ -6,6 +6,7 @@
 # may need to inckude kernel-devel
   with_items:
     - kernel
+    - kernel-devel
     - kernel-tools
     - kernel-tools-libs
     - kernel-bootwrapper

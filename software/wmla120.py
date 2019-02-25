@@ -55,6 +55,7 @@ class software(object):
     """
     def __init__(self, eval_ver=False, non_int=False, arch='ppc64le', proc_family=''):
         self.log = logger.getlogger()
+        self.log_lvl = logger.get_log_level_print()
         self.my_name = sys.modules[__name__].__name__
         self.yum_powerup_repo_files = []
         self.eval_ver = eval_ver
@@ -1578,7 +1579,7 @@ class software(object):
                     self.sw_vars['ansible_inventory'],
                     self.sw_vars['content_files']['anaconda'])
             elif (task['description'] ==
-                    "Check WMLA License acceptance"):
+                    "Check WMLA License acceptance and install to root"):
                 _interactive_wmla_license_accept(
                     self.sw_vars['ansible_inventory'])
             extra_args = ''
@@ -1596,17 +1597,19 @@ class software(object):
             extra_args += ' --vault-password-file ' + self.vault_pass_file
         elif 'become:' in open(f'{GEN_SOFTWARE_PATH}{tasks_path}').read():
             extra_args += ' --ask-become-pass'
+        verbose = ''
+        # verbose = '-vvv'
         if self.eval_ver:
             cmd = (f'{get_ansible_playbook_path()} -i '
                    f'{self.sw_vars["ansible_inventory"]} '
-                   f'{GEN_SOFTWARE_PATH}{self.my_name}_ansible/run.yml '
+                   f'{GEN_SOFTWARE_PATH}{self.my_name}_ansible/run.yml {verbose} '
                    f'--extra-vars "task_file={GEN_SOFTWARE_PATH}{tasks_path}" '
                    f'--extra-vars "@{GEN_SOFTWARE_PATH}software-vars-eval.yml" '
                    f'{extra_args}')
         else:
             cmd = (f'{get_ansible_playbook_path()} -i '
                    f'{self.sw_vars["ansible_inventory"]} '
-                   f'{GEN_SOFTWARE_PATH}{self.my_name}_ansible/run.yml '
+                   f'{GEN_SOFTWARE_PATH}{self.my_name}_ansible/run.yml {verbose} '
                    f'--extra-vars "task_file={GEN_SOFTWARE_PATH}{tasks_path}" '
                    f'--extra-vars "@{GEN_SOFTWARE_PATH}software-vars.yml" '
                    f'{extra_args}')
@@ -1621,7 +1624,14 @@ class software(object):
                 print('\nClient password required for privilege escalation')
             elif '--vault-password-file' in cmd:
                 self._unlock_vault(validate=False)
-            resp, err, rc = sub_proc_exec(cmd, shell=True)
+
+            if self.log_lvl == 'debug':
+                rc = sub_proc_display(cmd, shell=True)
+                resp = ''
+                err = ''
+            else:
+                resp, err, rc = sub_proc_exec(cmd, shell=True)
+
             log.debug(f"cmd: {cmd}\nresp: {resp}\nerr: {err}\nrc: {rc}")
             print("")  # line break
 
@@ -1691,12 +1701,13 @@ def _interactive_wmla_license_accept(ansible_inventory):
     resp, err, rc = sub_proc_exec(cmd, shell=True)
     inv = json.loads(resp)
 
-    accept_cmd = '/opt/anaconda3/bin/accept-ibm-wmla-license.sh '
+    # accept_cmd = 'IBM_POWERAI_LICENSE_ACCEPT=yes;/opt/anaconda3/bin/accept-ibm-wmla-license.sh '
+    accept_cmd = 'sudo env IBM_POWERAI_LICENSE_ACCEPT=yes /opt/anaconda3/bin/accept-ibm-wmla-license.sh '
     check_cmd = 'ls ~/.powerai/ibm-wmla-license/1.2.0/license/status.dat'
 
     print(bold('Acceptance of the WMLA Enterprise license is required on '
                'all nodes in the cluster.'))
-    rlinput(f'Press Enter to run interactively on each host')
+    rlinput(f'Press Enter to silently install on each host')
 
     for hostname, hostvars in inv['_meta']['hostvars'].items():
         base_cmd = f'ssh -t {hostvars["ansible_user"]}@{hostname} '
