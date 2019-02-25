@@ -39,14 +39,6 @@
   shell: "{{ install_dir }}/bin/conda install --yes pytorch powerai=1.6 -n dlipy3"
   become: yes
 
-#- name: Install frameworks
-#  shell: "{{ item }}"
-#  loop:
-#    - "{{ install_dir }}/bin/conda install --yes tensorflow powerai=1.6 -n dlipy3"
-#    - "{{ install_dir }}/bin/conda install --yes caffe powerai=1.6 -n dlipy3"
-#    - "{{ install_dir }}/bin/conda install --yes pytorch powerai=1.6 -n dlipy3"
-#  become: yes
-
 - name: Activate dlipy3 environment and install dependencies
   shell: "source {{ install_dir }}/bin/activate dlipy3 && {{ item }}"
   loop:
@@ -91,14 +83,6 @@
 - name: Install pytorch in dlipy2
   shell: "{{ install_dir }}/bin/conda install --yes pytorch powerai=1.6 -n dlipy2"
   become: yes
-
-#- name: Install frameworks
-#  shell: "{{ item }}"
-#  loop:
-#    - "{{ install_dir }}/bin/conda install --yes tensorflow powerai=1.6 -n dlipy2"
-#    - "{{ install_dir }}/bin/conda install --yes caffe powerai=1.6 -n dlipy2"
-#    - "{{ install_dir }}/bin/conda install --yes pytorch powerai=1.6 -n dlipy2"
-#  become: yes
 
 - name: Activate dlipy2 environment and install dependencies
   shell: "source {{ install_dir }}/bin/activate dlipy2 && {{ item }}"

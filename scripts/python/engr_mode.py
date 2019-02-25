@@ -128,34 +128,29 @@ def pre_post_file_collect(task):
                                         #Clean cache
 
    def conda_clean_cache():
-      print("clean cache cmd: '/opt/anaconda3/bin/conda clean --all'")
-      input('Clean the conda cache, press enter when ready ')
-#      conda_cache = "/opt/anaconda3/conda-bld/"
-#      conda_cache_dir = ['src_cache','git_cache','hg_cache','svn_cache']
-#      ansible_prefix = f'ansible all -i {host_path} -m shell -a '
-#      print("\n*ENGINEERING MODE* INFO - Checking for conda cache")
-#      try:
-#         for cache_dir in conda_cache_dir:
-#            sub_proc_display(f"{ansible_prefix} 'ls {conda_cache}{cache_dir}'",
-#                             shell=True)
-#         sub_proc_display(f"{ansible_prefix} 'conda clean --all'{access}", shell=True)
-#      except FolderNotFoundError as exc:
-#            print ("\nINFO Cache directories do not exist\n")
+      conda_cache = "/opt/anaconda3/conda-bld/"
+      conda_cache_dir = ['src_cache','git_cache','hg_cache','svn_cache']
+      ansible_prefix = f'ansible all -i {host_path} -m shell -a '
+      print("\n*ENGINEERING MODE* INFO - Checking for conda cache")
+      try:
+         for cache_dir in conda_cache_dir:
+            sub_proc_display(f"{ansible_prefix} 'ls {conda_cache}{cache_dir}'",
+                             shell=True)
+         sub_proc_display(f"{ansible_prefix} 'conda clean --all'{access}", shell=True)
+      except FolderNotFoundError as exc:
+            print ("\nINFO Cache directories do not exist\n")
 
    def yum_clean_cache():
-      print("clean cache cmd: 'sudo yum clean all'")
-      input('Clean the yum cache, press enter when ready ')
-#
-#      yum_cache_dir = '/var/cache/yum'
-#      print("\n*ENGINEERING MODE* INFO - Checking for yum cache")
-#      try:
-#         sub_proc_display(f"{ansible_prefix} 'ls {yum_cache_dir}'",
-#                          shell=True)
-#         yum_clean = sub_proc_display(f"ansible all -i {host_path} -m shell -a '"
-#                                   f"yum clean'{access}", shell=True)
-#      except FolderNotFoundError as exc:
-#         print ("\nINFO Cache directories do not exist\n")
-#
+      yum_cache_dir = '/var/cache/yum'
+      print("\n*ENGINEERING MODE* INFO - Checking for yum cache")
+      try:
+         sub_proc_display(f"{ansible_prefix} 'ls {yum_cache_dir}'",
+                          shell=True)
+         yum_clean = sub_proc_display(f"ansible all -i {host_path} -m shell -a '"
+                                   f"yum clean'{access}", shell=True)
+      except FolderNotFoundError as exc:
+         print ("\nINFO Cache directories do not exist\n")
+
 
                                         #Start
 
