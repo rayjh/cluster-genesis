@@ -33,7 +33,6 @@ from getpass import getpass
 import pwd
 import grp
 import click
-#import code
 
 import lib.logger as logger
 from repos import PowerupRepo, PowerupRepoFromDir, PowerupYumRepoFromRepo, \
@@ -66,7 +65,7 @@ class software(object):
             self.proc_family = self.arch
         self.eng_mode = None
         # self.eng_mode = 'custom-repo'
-        self.eng_mode = 'gather-dependencies'
+        # self.eng_mode = 'gather-dependencies'
         yaml.add_constructor(YAMLVault.yaml_tag, YAMLVault.from_yaml)
         self.arch = arch
         self.log.info(f"Using architecture: {self.arch}")
@@ -81,7 +80,6 @@ class software(object):
                       'Anaconda content': '-',
                       'Anaconda Free Repository': '-',
                       'Anaconda Main Repository': '-',
-                      #'Conda-forge Repository': '-',
                       'Spectrum conductor content': '-',
                       'Spectrum conductor content entitlement': '-',
                       'Spectrum DLI content': '-',
@@ -185,8 +183,6 @@ class software(object):
         self.sw_vars['rhel_ver'] = self.rhel_ver
         self.sw_vars['arch'] = self.arch
         self.root_dir = '/srv'
-        #self.repo_dir = self.root_dir + 'repos/{repo_id}/rhel' + self.rhel_ver + \
-        #    '/{repo_id}'
 
         # When searching for files in other web servers, the fileglobs are converted to
         # regular expressions. An asterisk (*) after a bracket is converted to a
@@ -805,7 +801,7 @@ class software(object):
             files = glob.glob(repo_dir, recursive=True)
             if files:
                 self.sw_vars['cuda-drivers'] = re.search(r'cuda-drivers-\d+\.\d+-\d+',
-                                                        ' '.join(files)).group(0)
+                                                         ' '.join(files)).group(0)
             else:
                 self.log.error('No cuda toolkit file found in cuda repository')
 
@@ -820,7 +816,6 @@ class software(object):
 
         heading1(f'Set up {repo_name} repository')
 
-
         exists = self.status_prep(which='Dependent Packages Repository')
         if exists:
             self.log.info(f'The {repo_name} repository exists already'
@@ -833,11 +828,9 @@ class software(object):
 
         ch = 'S'
         if get_yesno(prompt=pr_str, yesno='Y/n'):
-
-
             if self.arch == 'ppc64le' and not self.proc_family:
                 self.proc_family, item = get_selection('Power 8\nPower 9', 'p8\np9',
-                                                'Processor family? ')
+                                                       'Processor family? ')
 
             if self.proc_family == 'p9':
                 dep_list = ' '.join(self.pkgs['yum_pkgs_p9'])
@@ -864,7 +857,6 @@ class software(object):
                 alt_url = self.sw_vars[f'{repo_id}_alt_url']
             else:
                 alt_url = None
-
 
             if platform.machine() == self.arch:
                 ch, item = get_selection('Sync required dependent packages from '
