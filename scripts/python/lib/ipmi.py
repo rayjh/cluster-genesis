@@ -82,9 +82,9 @@ def ipmi_fru2dict(fru_str):
     yaml_data = []
     #code.interact(banner='ipmi.ipmi_fru2dict', local=dict(globals(), **locals()))
     lines = fru_str.splitlines()
-    for i, line in enumerate(lines):
+    for i, _line in enumerate(lines):
         # Strip out any excess white space (including tabs) around the ':'
-        line = re.sub(r'\s*:\s*', ': ', line)
+        line = re.sub(r'\s*:\s*', ': ', _line)
         # Check for blank lines
         if re.search(r'^\s*$', line):
             yaml_data.append(line)
@@ -104,6 +104,8 @@ def ipmi_fru2dict(fru_str):
                     line = line.split(':')[0]
                 yaml_data.append(line + ':')
             else:
+                if ':' not in line:
+                    line += ':'
                 split = line.split(':', 1)
                 # Add quotes around the value to handle non alphanumerics
                 line = split[0] + ': "' + split[1] + '"'

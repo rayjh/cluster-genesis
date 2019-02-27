@@ -27,7 +27,6 @@ from pyroute2 import IPRoute
 import re
 import sys
 from time import time, sleep
-import code
 
 import lib.logger as logger
 import lib.interfaces as interfaces
@@ -285,22 +284,6 @@ class MyButtonPress(npyscreen.MiniButtonPress):
             self.parent.next_form = 'MAIN'
             self.parent.parentApp.switchForm('MAIN')
 
-        #if self.name == 'Scan for nodes':
-        #    p = self.parent.parentApp.prof.get_network_profile_tuple()
-        #    nodes = u.scan_subnet(p.bmc_subnet_cidr)
-        #    self.parent.fields['number_icmp_echo'].value = str(len(nodes))
-
-        #    ips = []
-        #    for node in nodes:
-        #        ips.append(node[0])
-        #    ips = ' '.join(ips)
-        #    nodes = u.scan_subnet_for_port_open(ips, 623)
-        #    #npyscreen.notify_confirm(f'port 623: {len(nodes)}', editw=1)
-        #    self.parent.fields['number_port_623'].value = str(len(nodes))
-
-        #    self.parent.fields['node_list'].values = nodes
-        #    self.parent.display()
-
         elif self.name == 'Scan for nodes':
             self.parent.scan = True
             self.name = 'Stop node scan'
@@ -332,12 +315,10 @@ class Pup_form(npyscreen.ActionFormV2):
         self.form = self.parentApp.get_form_data()
         self.fields = {}  # dictionary for holding field instances
         self.next_form = self.parentApp.NEXT_ACTIVE_FORM
-        self.node_list = []
+        self.talking_nodes = {}  # Nodes we can talk to using ipmi or openBMC
         if hasattr(self.form, 'bmc_userid'):
-            self.scan_uid = self.form['bmc_userid']
-            self.scan_pw = self.form['bmc_password']
-        else:
-            self.scan_uid = self.scan_pw = ''
+            self.scan_uid = self.form.bmc_userid.val
+            self.scan_pw = self.form.bmc_password.val
 
         for item in self.form:
             fname = self.form[item].desc
@@ -579,8 +560,45 @@ class Pup_form(npyscreen.ActionFormV2):
             npyscreen.notify(msg)
             sleep(1.5)
             self.display()
+            # nodes is list of tuples (ip, mac)
             nodes = u.scan_subnet(p.bmc_subnet_cidr)
-            self.fields['node_list'].values = nodes
+            node_dict = {node[0]: node[1] for node in nodes}
+
+            self.fields['devices_found'].value = str(len(nodes))
+
+            ips = [node[0] for node in nodes]
+
+            nodes = u.scan_subnet_for_port_open(ips, 623)
+
+            ips = [node[0] for node in nodes]
+            self.fields['bmcs_found'].value = str(len(nodes))
+
+            scan_uid = self.fields['bmc_userid'].value
+            scan_pw = self.fields['bmc_password'].value
+
+            if scan_uid != self.scan_uid or scan_pw != self.scan_pw:
+                self.talking_nodes = {}
+                self.fields['node_list'].values = [()]
+                self.fields['node_list'].value = 0
+                self.fields['devices_found'].value = None
+                self.fields['bmcs_found'].value = None
+                self.scan_uid = scan_uid
+                self.scan_pw = scan_pw
+
+            node_list = self._get_bmcs_sn_pn(ips, scan_uid, scan_pw)
+            if node_list:
+                for node in node_list:
+                    if node not in self.talking_nodes:
+                        self.talking_nodes[node] = node_list[node] + (node_dict[node], node)
+            field_list = [', '.join(self.talking_nodes[node]) for node in self.talking_nodes]
+
+            if len(self.talking_nodes) == int(self.fields['bmcs_found'].value):
+                self.scan = False
+                self.fields['scan_for_nodes'].name = 'Scan for nodes'
+
+            # code.interact(banner='waiting - scan2', local=dict(globals(), **locals()))
+            # npyscreen.notify_confirm(f'field list: {field_list}', editw=1)
+            self.fields['node_list'].values = field_list
             self.display()
 
     def while_editing(self, instance):
@@ -732,7 +750,8 @@ class Pup_form(npyscreen.ActionFormV2):
 
         if instance.name not in ['OK', 'Cancel', 'CANCEL', 'Edit network config',
                                  'Scan for nodes', 'Stop node scan']:
-            self.helpmsg = self.form[field].help
+            if field:
+                self.helpmsg = self.form[field].help
         else:
             self.prev_field = ''
 
@@ -749,8 +768,7 @@ class Pup_form(npyscreen.ActionFormV2):
     def scan_for_nodes(self):
         npyscreen.notify_confirm('Scanning for nodes')
 
-
-    def _get_bmcs_sn_pn(node_list, uid, pw):
+    def _get_bmcs_sn_pn(self, node_list, uid, pw):
         """ Scan the node list for BMCs. Return the sn and pn of nodes which responded
         Args:
             node_list: Tuple or list of node ipv4 addresses
@@ -766,36 +784,28 @@ class Pup_form(npyscreen.ActionFormV2):
             this_bmc = _bmc.Bmc(ip, uid, pw, 'ipmi')
             if this_bmc.is_connected():
                 bmc_inst[ip] = this_bmc
-            else:
-                log.debug('Unable to connect to {node} {n.bmc_userid} {n.bmc_password}')
 
-            # Create dict to hold inventory gathering sub process instances
-            sub_proc_instance = {}
-            # Start a sub process instance to gather inventory for each node.
-            for node in bmc_inst:
-                sub_proc_instance[node] = bmc_inst[node].get_system_inventory_in_background()
-            code.interact(banner='get bmcs sn pn 1', local=dict(globals(), **locals()))
-            # poll for inventory gathering completion
-            st_time = time()
-            timeout = 15  # seconds
+        # Create dict to hold inventory gathering sub process instances
+        sub_proc_instance = {}
+        # Start a sub process instance to gather inventory for each node.
+        for node in bmc_inst:
+            sub_proc_instance[node] = bmc_inst[node].get_system_inventory_in_background()
+        # poll for inventory gathering completion
+        st_time = time()
+        timeout = 15  # seconds
 
-            while time() < st_time + timeout and len(sn_pn_list) < len(bmc_inst):
-                for node in sub_proc_instance:
-                    if sub_proc_instance[node].poll() is not None:
-                        if sub_proc_instance[node].poll() == 0 and node not in sn_pn_list:
-                            inv, stderr = sub_proc_instance[node].communicate()
-                            inv = inv.decode('utf-8')
-                            sn_pn_list[node] = bmc_inst[node].extract_system_sn_pn(inv)
-            return sn_pn_list
+        while time() < st_time + timeout and len(sn_pn_list) < len(bmc_inst):
+            for node in sub_proc_instance:
+                if sub_proc_instance[node].poll() is not None:
+                    if sub_proc_instance[node].poll() == 0 and node not in sn_pn_list:
+                        inv, stderr = sub_proc_instance[node].communicate()
+                        inv = inv.decode('utf-8')
+                        sn_pn_list[node] = bmc_inst[node].extract_system_sn_pn(inv)
 
-#def validate(profile_tuple):
-#    LOG = logger.getlogger()
-#    if profile_tuple.bmc_address_mode == "dhcp" or profile_tuple.pxe_address_mode == "dhcp":
-#        hasDhcpServers = u.has_dhcp_servers(profile_tuple.ethernet_port)
-#        if not hasDhcpServers:
-#            LOG.warn("No Dhcp servers found on {0}".format(profile_tuple.ethernet_port))
-#        else:
-#            LOG.info("Dhcp servers found on {0}".format(profile_tuple.ethernet_port))
+        for node in bmc_inst:
+            bmc_inst[node].logout()
+
+        return sn_pn_list
 
 
 def main(prof_path):
@@ -810,17 +820,14 @@ def main(prof_path):
 
 #        pro = Profile(prof_path)
 #        p = pro.get_network_profile_tuple()
-#        log.debug(p)
 #        nodes = u.scan_subnet(p.bmc_subnet_cidr)
 #        ips = [node[0] for node in nodes]
-#        ips = ' '.join(ips)
 #        #code.interact(banner='osinstall.main1', local=dict(globals(), **locals()))
 #        nodes = u.scan_subnet_for_port_open(ips, 623)
 #        ips = [node[0] for node in nodes]
 #        n = pro.get_node_profile_tuple()
-#        #code.interact(banner='osinstall.main2', local=dict(globals(), **locals()))
-#        sn_pn_good_list = osi._get_bmcs_sn_pn(ips, n.bmc_userid, n.bmc_password)
-#        final_tup = [sn_pn_good_list[node[0]] + node for node in nodes]
+#        code.interact(banner='osinstall.main2', local=dict(globals(), **locals()))
+#        sn_pn_good_list = _get_bmcs_sn_pn(ips, n.bmc_userid, n.bmc_password)
 #        code.interact(banner='osinstall.main4', local=dict(globals(), **locals()))
 
 #        res = osi.ifcs.get_interfaces_names()
@@ -846,5 +853,5 @@ if __name__ == '__main__':
 
     if args.log_lvl_print == 'debug':
         print(args)
-    logger.create('nolog', 'info')
+    logger.create('nolog', 'nolog')
     main(args.prof_path)

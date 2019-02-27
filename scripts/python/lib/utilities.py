@@ -135,9 +135,12 @@ def scan_subnet(cidr):
 def scan_subnet_for_port_open(cidr, port):
     """Scans a subnet for responding devices.
     Args:
-        cidr (str): subnet in cidr format or can be list of ips seperated by spaces
+        cidr (str or list): subnet in cidr format or can be list of ips seperated
+        by spaces.
         port (str or int) : tcp port to check
     """
+    if isinstance(cidr, list):
+        cidr = ' '.join(cidr)
     cmd = f'sudo nmap -p {port} {cidr}'
     res, err, rc = sub_proc_exec(cmd)
     items = []
