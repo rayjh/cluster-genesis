@@ -665,6 +665,45 @@ def validate(profile_tuple):
             LOG.info("Dhcp servers found on {0}".format(profile_tuple.ethernet_port))
 
 
+def _get_bmcs_sn_pn(node_list, uid, pw):
+    """ Scan the node list for BMCs. Return the sn and pn of nodes which responded
+    Args:
+        node_list: Tuple or list of node ipv4 addresses
+    returns:
+        List of tuples containing ip, sn, pn
+    """
+    # create dict to hold Bmc class instances
+    bmc_inst = {}
+    # list for responding BMCs
+    sn_pn_list = {}
+
+    for ip in node_list:
+        this_bmc = _bmc.Bmc(ip, uid, pw, 'ipmi')
+        if this_bmc.is_connected():
+            bmc_inst[ip] = this_bmc
+        else:
+            log.debug('Unable to connect to {node} {n.bmc_userid} {n.bmc_password}')
+
+        # Create dict to hold inventory gathering sub process instances
+        sub_proc_instance = {}
+        # Start a sub process instance to gather inventory for each node.
+        for node in bmc_inst:
+            sub_proc_instance[node] = bmc_inst[node].get_system_inventory_in_background()
+        code.interact(banner='get bmcs sn pn 1', local=dict(globals(), **locals()))
+        # poll for inventory gathering completion
+        st_time = time()
+        timeout = 15  # seconds
+
+        while time() < st_time + timeout and len(sn_pn_list) < len(bmc_inst):
+            for node in sub_proc_instance:
+                if sub_proc_instance[node].poll() is not None:
+                    if sub_proc_instance[node].poll() == 0 and node not in sn_pn_list:
+                        inv, stderr = sub_proc_instance[node].communicate()
+                        inv = inv.decode('utf-8')
+                        sn_pn_list[node] = bmc_inst[node].extract_system_sn_pn(inv)
+        return sn_pn_list
+        #print(f'poll response for {node}: {inv[node].poll()}')
+
 def main(prof_path):
     log = logger.getlogger()
 
@@ -678,51 +717,15 @@ def main(prof_path):
         p = pro.get_network_profile_tuple()
         log.debug(p)
         nodes = u.scan_subnet(p.bmc_subnet_cidr)
-        ips = []
-        for node in nodes:
-            ips.append(node[0])
+        ips = [node[0] for node in nodes]
         ips = ' '.join(ips)
         #code.interact(banner='osinstall.main1', local=dict(globals(), **locals()))
         nodes = u.scan_subnet_for_port_open(ips, 623)
-
-        #ips = ' '.join(ips)
-        #for node in nodes:
-        #    ips.append(node[0])
-        #ips = ' '.join(ips)
-
+        ips = [node[0] for node in nodes]
         n = pro.get_node_profile_tuple()
-        # create dict to hold Bmc class instances
-        bmc = {}
-        code.interact(banner='osinstall.main2', local=dict(globals(), **locals()))
-
-        for ip, mac in nodes:
-            this_bmc = _bmc.Bmc(ip, n.bmc_userid, n.bmc_password, 'ipmi')
-            if this_bmc.is_connected():
-                bmc[ip] = this_bmc
-            else:
-                log.debug('Unable to connect to {node} {n.bmc_userid} {n.bmc_password}')
-
-        code.interact(banner='osinstall.main3', local=dict(globals(), **locals()))
-        # Create dict to hold inventory gathering sub process instances
-        sub_proc_instance = {}
-        # Start a sub process instance to gather inventory for each node.
-        for node in bmc:
-            sub_proc_instance[node] = bmc[node].get_system_inventory_in_background()
-
-        # poll for inventory gathering completion
-        st_time = time()
-        timeout = 15  # seconds
-        sn_pn = {}
-
-        while time() < st_time + timeout and len(sn_pn) < len(bmc):
-            for node in sub_proc_instance:
-                if sub_proc_instance[node].poll() is not None:
-                    if sub_proc_instance[node].poll() == 0 and node not in sn_pn:
-                        inv, stderr = sub_proc_instance[node].communicate()
-                        inv = inv.decode('utf-8')
-                        sn_pn[node] = bmc[node].extract_system_sn_pn(inv)
-        #print(f'poll response for {node}: {inv[node].poll()}')
-
+        #code.interact(banner='osinstall.main2', local=dict(globals(), **locals()))
+        sn_pn_good_list = _get_bmcs_sn_pn(ips, n.bmc_userid, n.bmc_password)
+        final_tup = [sn_pn_good_list[node[0]] + node for node in nodes]
         code.interact(banner='osinstall.main4', local=dict(globals(), **locals()))
 
 #        res = osi.ifcs.get_interfaces_names()
