@@ -185,118 +185,12 @@ def do_base_system_install(hosts):
 def do_remove_yum_dvd_repo():
     yum_remove_dvd()
 
-
-redhat_subscription =  '''- name: Create Red Hat Registration
-  hosts: localhost
-  tasks:
-    - name: Get RedHat Subscription Manager on Node rhsm.sh script
-      shell:  "wget --no-check-certificate --user='{0}' --password='{1}' -O /tmp/ibm-rhsm.sh https://ftp3.linux.ibm.com/dl.php?file=/redhat/ibm-rhsm.sh"
-    - name: Run  rhsm.sh  script
-      shell: "bash /tmp/ibm-rhsm.sh"
-      become: True
-      environment:
-        FTP3USER: '{2}'
-        FTP3PASS: '{3}'
-        FTP3FORCE: y'''
-
 def do_public_setup(hosts):
-    # ip route add default via  192.168.65.3
-    # setup network script to static
-    #    DEVICE=eth15
-     #  TYPE=Ethernet
-     #  BOOTPROTO=none
-     #  ONBOOT=yes
-     #  IPADDR=192.168.65.21
-     #  PREFIX=24
-     #  GATEWAY=192.168.65.3
-     #  NM_CONTROLLED=no
-     #  DEFROUTE=yes
-     #  ZONE=public
-    # setup redhat license
-    # add to /etc/hosts
-    #   192.168.65.21 server-1
-    #change hostname to server-1
-    #   hostnamectl set-hostname server-1
-    # install nfs-utils
-    # remove dvd iso repo
-    #   sudo rm -rf /etc/yum.repos.d/*dvd*
-    # add conda defaults to .condarc
-    # pypi repo set to output repo by removing  --index-url http://{{ host_ip.stdout }}/repos/pypi/simple
-    # and --trusted-host {{ host_ip.stdout }}
-     # make direcoroy
-     #  sudo mkdir -p /nfs/pwrai
-     #
-     # setup fstab to persist
-     # (make sure the owner matches the current user (not root)
-     # The owner of /nfs/pwrai  and it's subdirectories should now be nfsnobody,
-     # the owner of directories under pwrai  (ie rh) should be the local user)
-     #
-     #   echo "9.3.89.51:/media/shnfs_sdo/nfs/pwrai  /nfs/pwrai  nfs nolock,acl,rsize=8192,wsize=8192,timeo=14,intr,nfsvers=3 0 0" | sudo tee --append /etc/fstab
     pass
 
 def do_private_setup(hosts):
-    # pxe interface (eth15)
-    #  DEVICE=eth15
-    #  TYPE=Ethernet
-    #  BOOTPROTO=none
-    #  ONBOOT=yes
-    #  NM_CONTROLLED=no
-    #  IPADDR=192.168.65.21
-    # route-eth15
-    #  GATEWAY0=192.168.65.3
-    #  NETMASK0=255.255.255.0
-    #  ADDRESS0=9.3.89.0
-    # remove ip route add default via  192.168.65.3
-    #  sudo ip route del default
-    # setup network script to static
-    # sudo ip route add 9.3.89.00/24 via 192.168.65.3
-    # sudo sed -i "s/BOOTPROTO=dhcp/BOOTPROTO=none/g" /etc/sysconfig/network-scripts/ifcfg-eth15
-    # ADDRESS0=9.3.89.0
-    #  sudo echo "GATEWAY0=192.168.65.3" | sudo tee --append /etc/sysconfig/network-scripts/ifcfg-eth15
-    # sudo echo "NETMASK0=255.255.255.0" | sudo tee --append /etc/sysconfig/network-scripts/ifcfg-eth15
-    # sudo echo "ADDRESS0=9.3.89.0" | sudo tee --append /etc/sysconfig/network-scripts/ifcfg-eth15
-    #    DEVICE=eth15
-     #  TYPE=Ethernet
-     #  BOOTPROTO=none
-     #  ONBOOT=yes
-     #  IPADDR=192.168.65.21
-     #  PREFIX=24
-     #  GATEWAY=192.168.65.3
-     #  NM_CONTROLLED=no
-     #  DEFROUTE=yes
-     #  ZONE=public
-    # setup redhat license
-    # add to /etc/hosts
-    #   192.168.65.21 server-1
-    #change hostname to server-1
-    #   hostnamectl set-hostname server-1
-    # install nfs-utils
-    # add  dvd iso repo
-    #   sudo rm -rf /etc/yum.repos.d/*dvd*
-    # add conda defaults to .condarc
-    # pypi repo set to output repo by removing  --index-url http://{{ host_ip.stdout }}/repos/pypi/simple
-    # and --trusted-host {{ host_ip.stdout }}
-     # make direcoroy
-     #  sudo mkdir -p /nfs/pwrai
-     #  sudo mount -t nfs -o vers=3 9.3.89.51:/media/shnfs_sdo/nfs/pwrai /nfs/pwrai
-     # setup fstab to persist
-     # (make sure the owner matches the current user (not root)
-     # The owner of /nfs/pwrai  and it's subdirectories should now be nfsnobody,
-     # the owner of directories under pwrai  (ie rh) should be the local user)
-     #
-     #   echo "9.3.89.51:/media/shnfs_sdo/nfs/pwrai  /nfs/pwrai  nfs nolock,acl,rsize=8192,wsize=8192,timeo=14,intr,nfsvers=3 0 0" | sudo tee --append /etc/fstab
     pass
 def uninstall_wmla():
-    # source /opt/ibm/spectrumcomputing/profile.platform
-    #  egosh user logon -u Admin -x Admin
-#
-    #  egosh service stop all
-    #  egosh ego shutdown
-    #  sudo bash /opt/ibm/spectrumcomputing/uninstall/deeplearningimpactuninstall-1.2.2.0.sh
-    #  sudo bash /opt/ibm/spectrumcomputing/uninstall/conductorsparkuninstall-2.3.0.sh
-    #  sudo rm -rf /root/.powerai
-    #  sudo rm -rf /opt/anaconda3
-    #  sudo rm -rf /opt/ibm
     pass
 def get_pass(pass_type):
     return getpass("Password for ({0}): ".format(pass_type))
@@ -305,21 +199,7 @@ def get_user(user_type):
 def get_hosts(user_type):
     return getpass(" ({0}): ".format(user_type))
 def do_run_redhat_sub(args):
-    intranet_user = args.intranet_user
-    satellite_user = args.satellite_user
-    hosts  = args.hosts
-    # todo get input from user
-    runfile = tempfile.NamedTemporaryFile(delete=False)
-    subscribe = redhat_subscription.format(get_user("Intranet") if not intranet_user else intranet_user,
-                                           get_pass("Intranet"),
-                                           get_user("Red Hat Satellite") if not satellite_user else satellite_user,
-                                           get_pass("Red Hat Satellite")
-                                           )
-    print(f"{runfile.name}")
-    with open(runfile.name,'w') as f:
-        f.write(subscribe)
-    output = bash_cmd(f"ansible-playbook -i {HOST_PATH} {runfile.name} \" '{ACCESS}'".format(hosts))
-    print(output)
+    pass
 def get_cmd_install_rhel_repos():
     name =  "Install Rhell Rhepos"
     cmd = 'sudo yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm "'
