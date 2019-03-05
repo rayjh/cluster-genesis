@@ -290,8 +290,7 @@ def main(args):
         try:
             parsed_args = parse_input(args)
             LOG.info("Running operation '%s'", ' '.join(args))
-            parsed_args.func(parsed_args)
-            exit(RC_SUCCESS, "Operation %s completed successfully" % args[0])
+            parsed_args.func(parsed_args) exit(RC_SUCCESS, "Operation %s completed successfully" % args[0])
         except KeyboardInterrupt as k:
             exit(RC_USER_EXIT, "Exiting at user request ... {0}".format(k))
     else:

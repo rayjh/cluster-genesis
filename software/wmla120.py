@@ -63,7 +63,7 @@ class software(object):
         self.proc_family = proc_family
         if self.arch == 'x86_64' and not proc_family:
             self.proc_family = self.arch
-        self.eng_mode = "gather-dependencies"
+        self.eng_mode = None
         # self.eng_mode = 'custom-repo'
         # self.eng_mode = 'gather-dependencies'
         yaml.add_constructor(YAMLVault.yaml_tag, YAMLVault.from_yaml)
@@ -227,8 +227,6 @@ class software(object):
                                        'Dependent Packages Repository': '-',
                                        'Python Package Repository': '-',
                                        'Anaconda content': '-',
-                                       'Conda-forge linux-64 Repository': '-',
-                                       'Conda-forge noarch Repository': '-',
                                        'Anaconda Free Repository': '-',
                                        'Anaconda Main Repository': '-',
                                        'Spectrum conductor content': '-',
@@ -1008,7 +1006,7 @@ class software(object):
         if ch in 'Y':
             # if not exists or ch == 'F':
             url = repo.get_repo_url(baseurl, alt_url, contains=['free', 'linux',
-                                    f'{self.ana_platform_basename}'], excludes=['noarch', 'main'],
+                                    f'{self.arch}'], excludes=['noarch', 'main'],
                                     filelist=['cython-*'])
             if url:
                 if not url == baseurl:
@@ -1016,8 +1014,8 @@ class software(object):
 
                 # accept_list and rej_list are mutually exclusive.
                 # accept_list takes priority
-                al = self.pkgs[f'anaconda_free_linux_{self.ana_platform_basename}']['accept_list']
-                rl = self.pkgs[f'anaconda_free_linux_{self.ana_platform_basename}']['reject_list']
+                al = self.pkgs[f'anaconda_free_linux_{self.arch}']['accept_list']
+                rl = self.pkgs[f'anaconda_free_linux_{self.arch}']['reject_list']
 
                 dest_dir = repo.sync_ana(url, acclist=al, rejlist=rl)
                 dest_dir = dest_dir[4 + dest_dir.find('/srv'):5 + dest_dir.find('free')]
@@ -1055,14 +1053,14 @@ class software(object):
         ch = repo.get_action(exists)
         if ch in 'Y':
             url = repo.get_repo_url(baseurl, alt_url, contains=['main', 'linux',
-                                    f'{self.ana_platform_basename}'], excludes=['noarch', 'free'],
+                                    f'{self.arch}'], excludes=['noarch', 'free'],
                                     filelist=['bzip2-*'])
             if url:
                 if not url == baseurl:
                     self.sw_vars[f'{vars_key}-alt-url'] = url
                 # accept_list is used for main, reject_list for noarch
-                al = self.pkgs[f'anaconda_main_linux_{self.ana_platform_basename}']['accept_list']
-                rl = self.pkgs[f'anaconda_main_linux_{self.ana_platform_basename}']['reject_list']
+                al = self.pkgs[f'anaconda_main_linux_{self.arch}']['accept_list']
+                rl = self.pkgs[f'anaconda_main_linux_{self.arch}']['reject_list']
 
                 dest_dir = repo.sync_ana(url, acclist=al, rejlist=rl)
                 # dest_dir = repo.sync_ana(url)

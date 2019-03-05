@@ -19,18 +19,14 @@ import tempfile
 import argparse
 import os
 import sys
-import getpass
-STANDALONE = False
-import lib.logger as logger
-from lib.genesis import GEN_PATH, GEN_SOFTWARE_PATH, get_ansible_playbook_path, get_playbooks_path, get_dependencies_path
-from lib.utilities import sub_proc_display, sub_proc_exec, heading1, Color, \
-    get_selection, get_yesno, rlinput, bold, ansible_pprint, replace_regex, bash_cmd
 from pathlib import Path
-import bcrypt
+import lib.logger as logger
+from lib.genesis import get_playbooks_path, get_dependencies_path
+from lib.utilities import sub_proc_display, sub_proc_exec, bash_cmd
 from getpass import getpass
-from getpass import getuser
 
 SALT = "ireulcasdrill3727342=-124"
+STANDALONE = False
 DEPENDENCIES_PATH = get_dependencies_path()
 RC_SUCCESS = 0
 RC_ERROR = 99  # generic failure
@@ -40,20 +36,40 @@ RC_USER_EXIT = 40  # keyboard exit
 RC_PERMISSION = 41  # Permission denied
 YUM_CACHE_DIR = '/var/cache/yum'
 CONDA_CACHE = "/opt/anaconda3/conda-bld/"
-CONDA_CACHE_DIR = ['src_cache', 'git_cache', 'hg_cache',' svn_cache']
-HOST_PATH = get_playbooks_path() +'/software_hosts'
+CONDA_CACHE_DIR = ['src_cache', 'git_cache', 'hg_cache', 'svn_cache']
+HOST_PATH = get_playbooks_path() + '/software_hosts'
 ANSIBLE_PREFIX = f'ansible all -i {HOST_PATH} -m shell -a '
 YUM_CLEAN_ALL = 'yum clean all '
 LOG = ""
 ACCESS = ' --become --ask-become-pas'
+LOGFILE = "__name__" + ".log"
+
+
+def setup_logging(debug="INFO"):
+    '''
+    Method to setup logging based on debug flag
+    '''
+    LOG.setLevel(debug)
+    formatString = '%(asctime)s - %(levelname)s - %(message)s'
+    ch = logging.StreamHandler()
+    formatter = logging.Formatter(formatString)
+    ch.setFormatter(formatter)
+    LOG.addHandler(ch)
+    #  setup file handler
+    rfh = logging.FileHandler(filename=LOGFILE)
+    rfh.setFormatter(logging.Formatter(formatString))
+    LOG.addHandler(rfh)
+
 
 try:
     LOG = logger.getlogger()
     STANDALONE = False
 except:
+    import logging
     LOG = logging.getLogger(__name__)
     setup_logging()
     STANDALONE = True
+
 
 def exit(rc, *extra):
     message = "\n".join(extra)
@@ -76,32 +92,34 @@ def exit(rc, *extra):
             else:  # rc == RC_ERROR:
                 raise Exception(err)
 
+
 def get_string(string):
     tempstring = " "
-    tempstring +=string
+    tempstring += string
     tempstring += " }}"
     return tempstring
 
-#
+
 def dependency_folder_collector():
-   #sub_proc_display("ansible-fetch copy_text_files_from_client.yml",
-   #                 shell=True)
-   if not os.path.exists('{}'.format(DEPENDENCIES_PATH)):
-          os.makedirs('{}'.format(DEPENDENCIES_PATH))
+    # sub_proc_display("ansible-fetch copy_text_files_from_client.yml",
+    #                 shell=True)
+    if not os.path.exists('{}'.format(DEPENDENCIES_PATH)):
+        os.makedirs('{}'.format(DEPENDENCIES_PATH))
+
 
 def conda_clean_cache():
-  LOG.debug("\n*ENGINEERING MODE* INFO - Checking for conda cache")
-  try:
-     for cache_dir in CONDA_CACHE_DIR:
-         LOG.debug("\n*ENGINEERING MODE* INFO - Checking for conda cache")
-         sub_proc_display(f"{ANSIBLE_PREFIX} 'ls {CONDA_CACHE}{cache_dir}'",
-                         shell=True)
-  except Exception  as e:
-    LOG.debug("\nINFO ls failed\n{0}".format(e))
-  try:
-    sub_proc_display(f"{ANSIBLE_PREFIX} 'conda clean --all'{ACCESS}", shell=True)
-  except Exception as e:
-    LOG.debug("\nINFO Conda clean --all failed\n{0}".format(e))
+    LOG.debug("\n*ENGINEERING MODE* INFO - Checking for conda cache")
+    try:
+        for cache_dir in CONDA_CACHE_DIR:
+            LOG.debug("\n*ENGINEERING MODE* INFO - Checking for conda cache")
+            sub_proc_display(f"{ANSIBLE_PREFIX} 'ls {CONDA_CACHE}{cache_dir}'",
+                             shell=True)
+    except Exception  as e:
+        LOG.debug("\nINFO ls failed\n{0}".format(e))
+    try:
+        sub_proc_display(f"{ANSIBLE_PREFIX} 'conda clean --all'{ACCESS}", shell=True)
+    except Exception as e:
+        LOG.debug("\nINFO Conda clean --all failed\n{0}".format(e))
 
 
 def yum_clean_cache():
@@ -147,22 +165,26 @@ def do_run_ansible_cmd(cmd):
         output = bash_cmd(cmd)										   #client
         LOG.info("\nOutput:\n{0}".format(output))
     except Exception as e :
-         LOG.error("\nINFO failed to run {0}\n{1}".format(cmd,e))
+        LOG.error("\nINFO failed to run {0}\n{1}".format(cmd,e))
     return output
+
 
 def do_rpm_list_packages(hosts):
     LOG.debug("\n*ENGINEERING MODE* INFO - Remove dvd")
     cmd = 'list_date=$(date "+%Y.%m.%d-%H.%M.%S");rpm -qa --last > list"_"$list_date; cat list"_"$list_date'
     do_run_ansible_cmd(cmd)
 
+
 def do_base_system_install(hosts):
     LOG.debug("\n*ENGINEERING MODE* INFO - Remove dvd")
     cmd = 'sudo rpm -qi basesystem | grep Install'
-    output  = do_run_ansible_cmd(cmd)
+    output = do_run_ansible_cmd(cmd)
     print(output)
+
 
 def do_remove_yum_dvd_repo():
     yum_remove_dvd()
+
 
 redhat_subscription =  '''- name: Create Red Hat Registration
   hosts: localhost
@@ -220,6 +242,7 @@ def do_private_setup(hosts):
     #  ONBOOT=yes
     #  NM_CONTROLLED=no
     #  IPADDR=192.168.65.21
+    # route-eth15
     #  GATEWAY0=192.168.65.3
     #  NETMASK0=255.255.255.0
     #  ADDRESS0=9.3.89.0
@@ -263,7 +286,18 @@ def do_private_setup(hosts):
      #
      #   echo "9.3.89.51:/media/shnfs_sdo/nfs/pwrai  /nfs/pwrai  nfs nolock,acl,rsize=8192,wsize=8192,timeo=14,intr,nfsvers=3 0 0" | sudo tee --append /etc/fstab
     pass
-
+def uninstall_wmla():
+    # source /opt/ibm/spectrumcomputing/profile.platform
+    #  egosh user logon -u Admin -x Admin
+#
+    #  egosh service stop all
+    #  egosh ego shutdown
+    #  sudo bash /opt/ibm/spectrumcomputing/uninstall/deeplearningimpactuninstall-1.2.2.0.sh
+    #  sudo bash /opt/ibm/spectrumcomputing/uninstall/conductorsparkuninstall-2.3.0.sh
+    #  sudo rm -rf /root/.powerai
+    #  sudo rm -rf /opt/anaconda3
+    #  sudo rm -rf /opt/ibm
+    pass
 def get_pass(pass_type):
     return getpass("Password for ({0}): ".format(pass_type))
 def get_user(user_type):
@@ -641,20 +675,6 @@ def do_yum_clean(hosts):
 def do_conda_clean(hosts):
     conda_clean_cache()
 
-def setup_logging(debug="INFO"):
-    '''
-    Method to setup logging based on debug flag
-    '''
-    LOG.setLevel(debug)
-    formatString = '%(asctime)s - %(levelname)s - %(message)s'
-    ch = logging.StreamHandler()
-    formatter = logging.Formatter(formatString)
-    ch.setFormatter(formatter)
-    LOG.addHandler(ch)
-    #  setup file handler
-    rfh = logging.FileHandler(filename=LOGFILE)
-    rfh.setFormatter(logging.Formatter(formatString))
-    LOG.addHandler(rfh)
 
 def main(args):
     """Wmla run ansible package retriever environment"""
