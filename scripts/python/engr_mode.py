@@ -19,9 +19,6 @@ import tempfile
 import argparse
 import os
 import sys
-import re
-import subprocess
-import code
 import getpass
 STANDALONE = False
 import lib.logger as logger
@@ -29,7 +26,11 @@ from lib.genesis import GEN_PATH, GEN_SOFTWARE_PATH, get_ansible_playbook_path, 
 from lib.utilities import sub_proc_display, sub_proc_exec, heading1, Color, \
     get_selection, get_yesno, rlinput, bold, ansible_pprint, replace_regex, bash_cmd
 from pathlib import Path
+import bcrypt
+from getpass import getpass
+from getpass import getuser
 
+SALT = "ireulcasdrill3727342=-124"
 DEPENDENCIES_PATH = get_dependencies_path()
 RC_SUCCESS = 0
 RC_ERROR = 99  # generic failure
@@ -39,7 +40,7 @@ RC_USER_EXIT = 40  # keyboard exit
 RC_PERMISSION = 41  # Permission denied
 YUM_CACHE_DIR = '/var/cache/yum'
 CONDA_CACHE = "/opt/anaconda3/conda-bld/"
-CONDA_CACHE_DIR = ['src_cache','git_cache','hg_cache','svn_cache']
+CONDA_CACHE_DIR = ['src_cache', 'git_cache', 'hg_cache',' svn_cache']
 HOST_PATH = get_playbooks_path() +'/software_hosts'
 ANSIBLE_PREFIX = f'ansible all -i {HOST_PATH} -m shell -a '
 YUM_CLEAN_ALL = 'yum clean all '
@@ -140,7 +141,7 @@ def parse_ansible_output(output):
 
 def do_run_ansible_cmd(cmd):
     output = ""
-    cmd = f"{ANSIBLE_PREFIX} '{cmd}' {ACCESS}" 
+    cmd = f"{ANSIBLE_PREFIX} '{cmd}' {ACCESS}"
     print("\nRunning: {0}".format(cmd))
     try:
         output = bash_cmd(cmd)										   #client
@@ -163,8 +164,8 @@ def do_base_system_install(hosts):
 def do_remove_yum_dvd_repo():
     yum_remove_dvd()
 
-redhat_subscription =  '''- name: Create Red Hat Registration 
-  hosts: "{{ variable_host | default('') }}" 
+redhat_subscription =  '''- name: Create Red Hat Registration
+  hosts: localhost
   tasks:
     - name: Get RedHat Subscription Manager on Node rhsm.sh script
       shell:  "wget --no-check-certificate --user='{0}' --password='{1}' -O /tmp/ibm-rhsm.sh https://ftp3.linux.ibm.com/dl.php?file=/redhat/ibm-rhsm.sh"
@@ -190,30 +191,47 @@ def do_public_setup(hosts):
      #  DEFROUTE=yes
      #  ZONE=public
     # setup redhat license
-    # add to /etc/hosts 
+    # add to /etc/hosts
     #   192.168.65.21 server-1
-    #change hostname to server-1 
+    #change hostname to server-1
     #   hostnamectl set-hostname server-1
     # install nfs-utils
     # remove dvd iso repo
     #   sudo rm -rf /etc/yum.repos.d/*dvd*
     # add conda defaults to .condarc
     # pypi repo set to output repo by removing  --index-url http://{{ host_ip.stdout }}/repos/pypi/simple
-    # and --trusted-host {{ host_ip.stdout }} 
+    # and --trusted-host {{ host_ip.stdout }}
      # make direcoroy
      #  sudo mkdir -p /nfs/pwrai
-     # 
+     #
      # setup fstab to persist
      # (make sure the owner matches the current user (not root)
-     # The owner of /nfs/pwrai  and it's subdirectories should now be nfsnobody, 
+     # The owner of /nfs/pwrai  and it's subdirectories should now be nfsnobody,
      # the owner of directories under pwrai  (ie rh) should be the local user)
-     # 
+     #
      #   echo "9.3.89.51:/media/shnfs_sdo/nfs/pwrai  /nfs/pwrai  nfs nolock,acl,rsize=8192,wsize=8192,timeo=14,intr,nfsvers=3 0 0" | sudo tee --append /etc/fstab
     pass
 
 def do_private_setup(hosts):
+    # pxe interface (eth15)
+    #  DEVICE=eth15
+    #  TYPE=Ethernet
+    #  BOOTPROTO=none
+    #  ONBOOT=yes
+    #  NM_CONTROLLED=no
+    #  IPADDR=192.168.65.21
+    #  GATEWAY0=192.168.65.3
+    #  NETMASK0=255.255.255.0
+    #  ADDRESS0=9.3.89.0
     # remove ip route add default via  192.168.65.3
+    #  sudo ip route del default
     # setup network script to static
+    # sudo ip route add 9.3.89.00/24 via 192.168.65.3
+    # sudo sed -i "s/BOOTPROTO=dhcp/BOOTPROTO=none/g" /etc/sysconfig/network-scripts/ifcfg-eth15
+    # ADDRESS0=9.3.89.0
+    #  sudo echo "GATEWAY0=192.168.65.3" | sudo tee --append /etc/sysconfig/network-scripts/ifcfg-eth15
+    # sudo echo "NETMASK0=255.255.255.0" | sudo tee --append /etc/sysconfig/network-scripts/ifcfg-eth15
+    # sudo echo "ADDRESS0=9.3.89.0" | sudo tee --append /etc/sysconfig/network-scripts/ifcfg-eth15
     #    DEVICE=eth15
      #  TYPE=Ethernet
      #  BOOTPROTO=none
@@ -225,43 +243,52 @@ def do_private_setup(hosts):
      #  DEFROUTE=yes
      #  ZONE=public
     # setup redhat license
-    # add to /etc/hosts 
+    # add to /etc/hosts
     #   192.168.65.21 server-1
-    #change hostname to server-1 
+    #change hostname to server-1
     #   hostnamectl set-hostname server-1
     # install nfs-utils
     # add  dvd iso repo
     #   sudo rm -rf /etc/yum.repos.d/*dvd*
     # add conda defaults to .condarc
     # pypi repo set to output repo by removing  --index-url http://{{ host_ip.stdout }}/repos/pypi/simple
-    # and --trusted-host {{ host_ip.stdout }} 
+    # and --trusted-host {{ host_ip.stdout }}
      # make direcoroy
      #  sudo mkdir -p /nfs/pwrai
-     # 
+     #  sudo mount -t nfs -o vers=3 9.3.89.51:/media/shnfs_sdo/nfs/pwrai /nfs/pwrai
      # setup fstab to persist
      # (make sure the owner matches the current user (not root)
-     # The owner of /nfs/pwrai  and it's subdirectories should now be nfsnobody, 
+     # The owner of /nfs/pwrai  and it's subdirectories should now be nfsnobody,
      # the owner of directories under pwrai  (ie rh) should be the local user)
-     # 
+     #
      #   echo "9.3.89.51:/media/shnfs_sdo/nfs/pwrai  /nfs/pwrai  nfs nolock,acl,rsize=8192,wsize=8192,timeo=14,intr,nfsvers=3 0 0" | sudo tee --append /etc/fstab
     pass
 
-def do_run_redhat_sub(hosts):
+def get_pass(pass_type):
+    return getpass("Password for ({0}): ".format(pass_type))
+def get_user(user_type):
+    return input("User for ({0}): ".format(user_type))
+def get_hosts(user_type):
+    return getpass(" ({0}): ".format(user_type))
+def do_run_redhat_sub(args):
+    intranet_user = args.intranet_user
+    satellite_user = args.satellite_user
+    hosts  = args.hosts
     # todo get input from user
-    runfile = tempfile.NamedTemporaryFile() 
-    subscribe = redhat_subscription.format('',
-                                           '', 
-                                           '',
-                                           '')
+    runfile = tempfile.NamedTemporaryFile(delete=False)
+    subscribe = redhat_subscription.format(get_user("Intranet") if not intranet_user else intranet_user,
+                                           get_pass("Intranet"),
+                                           get_user("Red Hat Satellite") if not satellite_user else satellite_user,
+                                           get_pass("Red Hat Satellite")
+                                           )
     print(f"{runfile.name}")
     with open(runfile.name,'w') as f:
         f.write(subscribe)
-    output = bash_cmd(f"ansible-playbook {runfile.name} --extra-vars=\"variable_host={0}\" '{ACCESS}'".format(hosts))
+    output = bash_cmd(f"ansible-playbook -i {HOST_PATH} {runfile.name} \" '{ACCESS}'".format(hosts))
     print(output)
 def get_cmd_install_rhel_repos():
     name =  "Install Rhell Rhepos"
-    cmd = 'sudo yum install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm && sudo subscription-manager repos --enable "rhel-*-optional-rpms"\
-        --enable "rhel-*-extras-rpms"  --enable "rhel-ha-for-rhel-*-server-rpms"'
+    cmd = 'sudo yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm "'
     return cmd,name
 def do_install_rhel_repos(hosts):
     LOG.debug("Install Rhel Public Repos")
@@ -449,9 +476,9 @@ def configure_spectrum_conductor():
              process='source /opt/anaconda3/bin/activate dlinsights && '
                      'conda list --explicit')
 def do_call_file_collector(args):
-    soft_type = args.soft_type 
-    environment = args.environment 
-    at_time = args.at_time 
+    soft_type = args.soft_type
+    environment = args.environment
+    at_time = args.at_time
     command = f"{environment} list"
     if environment == "conda":
         command = command + " --explicit"
@@ -541,7 +568,11 @@ def parse_input(args):
                   [('hosts', 'hosts file path', False)])
 
     add_subparser('run_redhat_sub', "run redhat subscription",
-                  [('hosts', 'hosts file path', False)])
+                  [
+                      ('hosts', 'hosts file path', False),
+                      ('intranet_user', 'hosts file path', False),
+                      ('satellite_user', 'hosts file path', False)
+                   ])
     add_subparser('install_rhel_repos', "run install rhel repos on hosts",
                   [('hosts', 'hosts file path', False)])
     add_subparser('call_file_collector', "call file collector",
@@ -569,6 +600,12 @@ def parse_input(args):
         LOG.setLevel(args.loglevel)
     return args
 
+def validate_intranet_user(intranet):
+    return intranet
+
+def validate_satellite_user(intranet):
+    return intranet
+
 def validate_exists(name, path):
     if not os.path.exists(path):
         exit(RC_ARGS, "{1} does not exist ({0})".format(path, name))
@@ -586,10 +623,10 @@ def validate_environment(environment):
     return validate_values(envs, environment)
 
 def validate_at_time(at_time):
-    return validate_values(["post", "pre"],at_time) 
+    return validate_values(["post", "pre"],at_time)
 
 def validate_soft_type(soft_type):
-    return validate_values(['dlinsights',"dlipy2", "dlipy3"],soft_type) 
+    return validate_values(['dlinsights',"dlipy2", "dlipy3"],soft_type)
 
 def validate_hosts(hosts):
     if not hosts:

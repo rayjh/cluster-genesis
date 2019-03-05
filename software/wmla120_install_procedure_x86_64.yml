@@ -8,8 +8,8 @@
 - description: Update kernel
   tasks: update_kernel_x86_64.yml
 
-- description: Disable Memory Auto-Onlining
-  tasks: disable_udev_mem_auto_onlining.yml
+# - description: Disable Memory Auto-Onlining
+  # tasks: disable_udev_mem_auto_onlining.yml
 
 - description: Install CUDA
   tasks: install_cuda.yml

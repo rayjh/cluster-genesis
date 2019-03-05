@@ -33,7 +33,6 @@ from getpass import getpass
 import pwd
 import grp
 import click
-import code
 
 import lib.logger as logger
 from repos import PowerupRepo, PowerupRepoFromDir, PowerupYumRepoFromRepo, \
@@ -64,7 +63,7 @@ class software(object):
         self.proc_family = proc_family
         if self.arch == 'x86_64' and not proc_family:
             self.proc_family = self.arch
-        self.eng_mode = "gather-dependencies" 
+        self.eng_mode = "gather-dependencies"
         # self.eng_mode = 'custom-repo'
         # self.eng_mode = 'gather-dependencies'
         yaml.add_constructor(YAMLVault.yaml_tag, YAMLVault.from_yaml)
@@ -73,7 +72,7 @@ class software(object):
         self.log.info(f"Using architecture: {self.arch}")
         # add filename to distinguish architecture
         self.base_filename = f'{self.my_name}' if self.arch == 'ppc64le' else f'{self.my_name}_{self.arch}'
-        self.state = self.get_state() 
+        self.state = self.get_state()
         # Only yum repos should be listed under self.repo_id
         self.repo_id = {'EPEL Repository': f'epel-{self.arch}',
                         'Dependent Packages Repository': 'dependencies',
@@ -202,41 +201,42 @@ class software(object):
         self.vault_pass_file = f'{GEN_SOFTWARE_PATH}.vault'
 
         self.log.debug(f'software variables: {self.sw_vars}')
+
     def get_state(self):
         if self.arch == "ppc64le":
-            return {'EPEL Repository':'-',
-                                      'CUDA Driver Repository': '-',
-                                      'IBM AI Repository': '-',
-                                      'WMLA license content': '-',
-                                      'Dependent Packages Repository': '-',
-                                      'Python Package Repository': '-',
-                                      'Anaconda content': '-',
-                                      'Anaconda Free Repository': '-',
-                                      'Anaconda Main Repository': '-',
-                                      'Spectrum conductor content': '-',
-                                      'Spectrum conductor content entitlement': '-',
-                                      'Spectrum DLI content': '-',
-                                      'Spectrum DLI content entitlement': '-',
-                                      'Nginx Web Server': '-',
-                                      'Firewall': '-'}
+            return {'EPEL Repository': '-',
+                                       'CUDA Driver Repository': '-',
+                                       'IBM AI Repository': '-',
+                                       'WMLA license content': '-',
+                                       'Dependent Packages Repository': '-',
+                                       'Python Package Repository': '-',
+                                       'Anaconda content': '-',
+                                       'Anaconda Free Repository': '-',
+                                       'Anaconda Main Repository': '-',
+                                       'Spectrum conductor content': '-',
+                                       'Spectrum conductor content entitlement': '-',
+                                       'Spectrum DLI content': '-',
+                                       'Spectrum DLI content entitlement': '-',
+                                       'Nginx Web Server': '-',
+                                       'Firewall': '-'}
         else:
-            return {'EPEL Repository':'-',
-                                      'CUDA Driver Repository': '-',
-                                      'IBM AI Repository': '-',
-                                      'WMLA license content': '-',
-                                      'Dependent Packages Repository': '-',
-                                      'Python Package Repository': '-',
-                                      'Anaconda content': '-',
-                                      'Conda-forge linux-64 Repository': '-',
-                                      'Conda-forge noarch Repository': '-',
-                                      'Anaconda Free Repository': '-',
-                                      'Anaconda Main Repository': '-',
-                                      'Spectrum conductor content': '-',
-                                      'Spectrum conductor content entitlement': '-',
-                                      'Spectrum DLI content': '-',
-                                      'Spectrum DLI content entitlement': '-',
-                                      'Nginx Web Server': '-',
-                                      'Firewall': '-'}
+            return {'EPEL Repository': '-',
+                                       'CUDA Driver Repository': '-',
+                                       'IBM AI Repository': '-',
+                                       'WMLA license content': '-',
+                                       'Dependent Packages Repository': '-',
+                                       'Python Package Repository': '-',
+                                       'Anaconda content': '-',
+                                       'Conda-forge linux-64 Repository': '-',
+                                       'Conda-forge noarch Repository': '-',
+                                       'Anaconda Free Repository': '-',
+                                       'Anaconda Main Repository': '-',
+                                       'Spectrum conductor content': '-',
+                                       'Spectrum conductor content entitlement': '-',
+                                       'Spectrum DLI content': '-',
+                                       'Spectrum DLI content entitlement': '-',
+                                       'Nginx Web Server': '-',
+                                       'Firewall': '-'}
 
     def __del__(self):
         # Insure proper priority for conda channels
@@ -394,15 +394,15 @@ class software(object):
                 continue
 
             # Anaconda Conda-forge repo status
-            for it in ['','noarch', 'linux-64', "linux-ppc64le"]:
-                it = 'noarch'if it == '' else it 
+            for it in ['', 'noarch', 'linux-64', "linux-ppc64le"]:
+                it = 'noarch'if it == '' else it
                 if item == f'Conda-forge {it} Repository':
                     repodata = glob.glob('/srv/repos/anaconda/conda-forge'
                                          f'/{it}/repodata.json', recursive=True)
                     if repodata:
                         self.state[item] = f'{item} is setup'
                     continue
-            
+
         exists = True
         if which == 'all':
             heading1('Preparation Summary')
@@ -654,7 +654,7 @@ class software(object):
             files = glob.glob(repo_dir, recursive=True)
             if files:
                 self.sw_vars['cuda-drivers'] = re.search(r'cuda-drivers-\d+\.\d+-\d+',
-                                                        ' '.join(files)).group(0)
+                                                         ' '.join(files)).group(0)
             else:
                 self.log.error('No cuda toolkit file found in cuda repository')
 
@@ -663,7 +663,7 @@ class software(object):
         repo_id = 'ibmai'
         repo_name = 'IBM AI Repository'
         baseurl = ('https://public.dhe.ibm.com/ibmdl/export/pub/software/server/'
-                   'ibm-ai/conda/'+'linux-'+self.ana_platform_basename+"/")
+                   'ibm-ai/conda/' + 'linux-' + self.ana_platform_basename + "/")
         heading1(f'Set up {repo_name}\n')
 
         vars_key = get_name_dir(repo_name)  # format the name
@@ -1078,12 +1078,12 @@ class software(object):
                 rl = self.pkgs['anaconda_main_noarch']['reject_list']
                 repo.sync_ana(noarch_url, acclist=al, rejlist=rl)
 
-    def create_conda_forge_repo(self, eval_ver=False, non_int=False): 
+    def create_conda_forge_repo(self, eval_ver=False, non_int=False):
         for i in ['noarch', 'linux-64']:
             if f'Conda-forge {i} Repository' in self.state:
                 self._create_conda_forge_repo(arch_type=i)
-    
-    def _create_conda_forge_repo(self, eval_ver=False, non_int=False,arch_type="noarch"):
+
+    def _create_conda_forge_repo(self, eval_ver=False, non_int=False, arch_type="noarch"):
         # Setup Anaconda conda-forge Repo.  (not a YUM repo)
         repo_id = 'anaconda'
         repo_name = f'Conda-forge {arch_type} Repository'
@@ -1115,7 +1115,7 @@ class software(object):
                 al = self.pkgs[f'conda_forge_{pkg_yml_name}_pkgs']['accept_list']
 
                 dest_dir = repo.sync_ana(url, acclist=al)
-                dest_dir = dest_dir[4 + dest_dir.find('/srv'):7 + dest_dir.find(arch_type)]
+                dest_dir = "/" + dest_dir.split(self.root_dir)[1]
                 # form .condarc channel entry. Note that conda adds
                 # the corresponding 'noarch' channel automatically.
                 channel = f'  - http://{{{{ host_ip.stdout }}}}{dest_dir}'
@@ -1412,7 +1412,7 @@ class software(object):
         self.create_conda_free_repo()
 
         self.create_conda_main_repo()
-        
+
         self.create_conda_forge_repo()
 
         self.create_pypi_repo()
@@ -1675,7 +1675,7 @@ class software(object):
                                             'spark')
         _set_spectrum_conductor_install_env(self.sw_vars['ansible_inventory'],
                                             'dli', ana_ver)
-        specific_arch = "_"+self.arch if self.arch == 'x86_64' else ""
+        specific_arch = "_" + self.arch if self.arch == 'x86_64' else ""
         install_tasks = yaml.load(open(GEN_SOFTWARE_PATH +
                                        f'{self.my_name}_install_procedure{specific_arch}.yml'))
 
