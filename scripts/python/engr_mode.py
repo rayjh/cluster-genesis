@@ -123,18 +123,18 @@ def conda_clean_cache():
 
 
 def yum_clean_cache():
-  LOG.debug("\n*ENGINEERING MODE* INFO - Checking for yum cache")
-  try:
-     sub_proc_display(f"{ANSIBLE_PREFIX} 'ls {YUM_CACHE_DIR}'",
-                      shell=True)
-  except:
-     LOG.warn("\nINFO Cache directories do not exist\n")
+    LOG.debug("\n*ENGINEERING MODE* INFO - Checking for yum cache")
+    try:
+        sub_proc_display(f"{ANSIBLE_PREFIX} 'ls {YUM_CACHE_DIR}'",
+                        shell=True)
+    except:
+        LOG.warn("\nINFO Cache directories do not exist\n")
 
-  try:
-     yum_clean = sub_proc_display(f"ansible all -i {HOST_PATH} -m shell -a '"
+    try:
+        yum_clean = sub_proc_display(f"ansible all -i {HOST_PATH} -m shell -a '"
                                f"{YUM_CLEAN_ALL}'{ACCESS}", shell=True)										   #client
-  except:
-     LOG.warn("\nINFO Cache directories do not exist\n")
+    except:
+        LOG.warn("\nINFO Cache directories do not exist\n")
 
 def yum_remove_dvd():
   LOG.debug("\n*ENGINEERING MODE* INFO - Remove dvd")
@@ -605,25 +605,15 @@ def parse_input(args):
                   [
                       ('hosts', 'hosts file path', False),
                       ('intranet_user', 'hosts file path', False),
-                      ('satellite_user', 'hosts file path', False)
-                   ])
+                      ('satellite_user', 'hosts file path', False)])
+
     add_subparser('install_rhel_repos', "run install rhel repos on hosts",
                   [('hosts', 'hosts file path', False)])
     add_subparser('call_file_collector', "call file collector",
                   [('soft_type', 'dlipy2, dlipy3, dlinsights', True),
-                    ('environment', 'pip or conda', True),
-                    ('at_time', 'pre or post', True)
+                   ('environment', 'pip or conda', True),
+                   ('at_time', 'pre or post', True)
                    ])
-
-    #  add_subparser('bundle', "Bundle Paie software, assume bundle from /srv directory",
-                  #  [('to', 'bundle paie software to?', True)])
-#
-    #  subparsers.choices['bundle'].add_argument('--compress', dest="compress",
-                                              #  required=False, action="store_true",
-                                              #  help='compress using gzip')
-#
-    #  add_subparser('extract_bundle', "Extract bundle Paie software assume to /srv",
-                  #  [('from_archive', 'from which archive to extract paie software?', True)])
 
     if not args:
         parser.print_help()
@@ -634,11 +624,14 @@ def parse_input(args):
         LOG.setLevel(args.loglevel)
     return args
 
+
 def validate_intranet_user(intranet):
     return intranet
 
+
 def validate_satellite_user(intranet):
     return intranet
+
 
 def validate_exists(name, path):
     if not os.path.exists(path):
@@ -646,32 +639,35 @@ def validate_exists(name, path):
     LOG.debug("{1} = {0}".format(path, name))
     return path
 
+
 def validate_values(envs, environment):
     if environment not in envs:
         LOG.debug("{1} != {0}".format(environment, " ".join(envs)))
         exit(RC_ARGS, "Only options are: ".format(" ".join(envs)))
     return environment
 
+
 def validate_environment(environment):
     envs = ["pip", "conda"]
     return validate_values(envs, environment)
 
+
 def validate_at_time(at_time):
-    return validate_values(["post", "pre"],at_time)
+    return validate_values(["post", "pre"], at_time)
+
 
 def validate_soft_type(soft_type):
-    return validate_values(['dlinsights',"dlipy2", "dlipy3"],soft_type)
+    return validate_values(['dlinsights', "dlipy2", "dlipy3"], soft_type)
+
 
 def validate_hosts(hosts):
-    if not hosts:
-        LOG.info( "{1} does not exist ({0})".format(hosts, 'hosts'))
-        hosts = HOST_PATH
-    LOG.debug("{1} = {0}".format(hosts, name))
-    return validate_exits("hosts", hosts)
+    return validate_exists("hosts", hosts)
+
 
 def do_yum_clean(hosts):
-    HOST_PATH = hosts
     yum_clean_cache()
+
+
 def do_conda_clean(hosts):
     conda_clean_cache()
 

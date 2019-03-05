@@ -726,8 +726,12 @@ class Gen(object):
                     try:
                         soft.prep_init()
                         for step in self.args.step:
-                            func = getattr(soft, "create_" + step)
-                            func()
+                            run_this = "create_" + step
+                            if hasattr(soft, run_this):
+                                func = getattr(soft, run_this)
+                                func()
+                            else:
+                                print('\nUnable to find: ' + step + " in :" + self.args.name)
                         soft.prep_post()
                     except AttributeError as exc:
                         print(exc)

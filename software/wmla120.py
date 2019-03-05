@@ -69,6 +69,10 @@ class software(object):
         yaml.add_constructor(YAMLVault.yaml_tag, YAMLVault.from_yaml)
         self.arch = arch
         self.ana_platform_basename = '64' if self.arch == "x86_64" else self.arch
+        self.sw_vars_file_name = 'software-vars'
+        self.sw_vars_file_name = self.sw_vars_file_name + '-eval' if self.eval_ver else self.sw_vars_file_name
+        #  self.sw_vars_file_name = self.sw_vars_file_name if self.arch == "ppc64le" else self.sw_vars_file_name + "_" + self.arch
+        self.sw_vars_file_name = self.sw_vars_file_name + ".yml"
         self.log.info(f"Using architecture: {self.arch}")
         # add filename to distinguish architecture
         self.base_filename = f'{self.my_name}' if self.arch == 'ppc64le' else f'{self.my_name}_{self.arch}'
@@ -83,13 +87,12 @@ class software(object):
 
         if self.eval_ver:
             try:
-                self.sw_vars = yaml.load(open(GEN_SOFTWARE_PATH +
-                                         'software-vars-eval.yml'))
+                self.sw_vars = yaml.load(open(GEN_SOFTWARE_PATH + f'{self.sw_vars_file_name}'))
             except IOError:
                 # if no eval vars file exist, see if the license var file exists
                 # and start with that
                 try:
-                    self.sw_vars = yaml.load(open(GEN_SOFTWARE_PATH + 'software-vars.yml'))
+                    self.sw_vars = yaml.load(open(GEN_SOFTWARE_PATH + f'{self.sw_vars_file_name}'))
                 except IOError:
                     self.log.info('Creating software vars yaml file')
                     self.sw_vars = {}
@@ -106,12 +109,12 @@ class software(object):
                     self.sw_vars['prep-timestamp'] = calendar.timegm(time.gmtime())
         else:
             try:
-                self.sw_vars = yaml.load(open(GEN_SOFTWARE_PATH + 'software-vars.yml'))
+                self.sw_vars = yaml.load(open(GEN_SOFTWARE_PATH + f'{self.sw_vars_file_name}'))
             except IOError:
                 # if no licensed vars file exist, see if the eval var file exists
                 # and start with that
                 try:
-                    self.sw_vars = yaml.load(open(GEN_SOFTWARE_PATH + 'software-vars-eval.yml'))
+                    self.sw_vars = yaml.load(open(GEN_SOFTWARE_PATH + f'{self.sw_vars_file_name}'))
                 except IOError:
                     self.log.info('Creating software vars yaml file')
                     self.sw_vars = {}
@@ -137,14 +140,14 @@ class software(object):
         if self.eval_ver:
             self.eval_prep_timestamp = self.sw_vars['prep-timestamp']
             try:
-                temp = yaml.load(open(GEN_SOFTWARE_PATH + 'software-vars.yml'))
+                temp = yaml.load(open(GEN_SOFTWARE_PATH + f'{self.sw_vars_file_name}'))
                 self.lic_prep_timestamp = temp['prep-timestamp']
             except (IOError, KeyError):
                 self.lic_prep_timestamp = 0
         else:
             self.lic_prep_timestamp = self.sw_vars['prep-timestamp']
             try:
-                temp = yaml.load(open(GEN_SOFTWARE_PATH + 'software-vars-eval.yml'))
+                temp = yaml.load(open(GEN_SOFTWARE_PATH + f'{self.sw_vars_file_name}'))
                 self.eval_prep_timestamp = temp['prep-timestamp']
             except (IOError, KeyError):
                 self.eval_prep_timestamp = 0
@@ -205,36 +208,36 @@ class software(object):
     def get_state(self):
         if self.arch == "ppc64le":
             return {'EPEL Repository': '-',
-                                       'CUDA Driver Repository': '-',
-                                       'IBM AI Repository': '-',
-                                       'WMLA license content': '-',
-                                       'Dependent Packages Repository': '-',
-                                       'Python Package Repository': '-',
-                                       'Anaconda content': '-',
-                                       'Anaconda Free Repository': '-',
-                                       'Anaconda Main Repository': '-',
-                                       'Spectrum conductor content': '-',
-                                       'Spectrum conductor content entitlement': '-',
-                                       'Spectrum DLI content': '-',
-                                       'Spectrum DLI content entitlement': '-',
-                                       'Nginx Web Server': '-',
-                                       'Firewall': '-'}
+                    'CUDA Driver Repository': '-',
+                    'IBM AI Repository': '-',
+                    'WMLA license content': '-',
+                    'Dependent Packages Repository': '-',
+                    'Python Package Repository': '-',
+                    'Anaconda content': '-',
+                    'Anaconda Free Repository': '-',
+                    'Anaconda Main Repository': '-',
+                    'Spectrum conductor content': '-',
+                    'Spectrum conductor content entitlement': '-',
+                    'Spectrum DLI content': '-',
+                    'Spectrum DLI content entitlement': '-',
+                    'Nginx Web Server': '-',
+                    'Firewall': '-'}
         else:
             return {'EPEL Repository': '-',
-                                       'CUDA Driver Repository': '-',
-                                       'IBM AI Repository': '-',
-                                       'WMLA license content': '-',
-                                       'Dependent Packages Repository': '-',
-                                       'Python Package Repository': '-',
-                                       'Anaconda content': '-',
-                                       'Anaconda Free Repository': '-',
-                                       'Anaconda Main Repository': '-',
-                                       'Spectrum conductor content': '-',
-                                       'Spectrum conductor content entitlement': '-',
-                                       'Spectrum DLI content': '-',
-                                       'Spectrum DLI content entitlement': '-',
-                                       'Nginx Web Server': '-',
-                                       'Firewall': '-'}
+                    'CUDA Driver Repository': '-',
+                    'IBM AI Repository': '-',
+                    'WMLA license content': '-',
+                    'Dependent Packages Repository': '-',
+                    'Python Package Repository': '-',
+                    'Anaconda content': '-',
+                    'Anaconda Free Repository': '-',
+                    'Anaconda Main Repository': '-',
+                    'Spectrum conductor content': '-',
+                    'Spectrum conductor content entitlement': '-',
+                    'Spectrum DLI content': '-',
+                    'Spectrum DLI content entitlement': '-',
+                    'Nginx Web Server': '-',
+                    'Firewall': '-'}
 
     def __del__(self):
         # Insure proper priority for conda channels
@@ -255,23 +258,23 @@ class software(object):
         if not os.path.exists(GEN_SOFTWARE_PATH):
             os.mkdir(GEN_SOFTWARE_PATH)
         if self.eval_ver:
-            with open(GEN_SOFTWARE_PATH + 'software-vars-eval.yml', 'w') as f:
+            with open(GEN_SOFTWARE_PATH + f'{self.sw_vars_file_name}', 'w') as f:
                 f.write('# Do not edit this file. This file is autogenerated.\n')
-            with open(GEN_SOFTWARE_PATH + 'software-vars-eval.yml', 'a') as f:
+            with open(GEN_SOFTWARE_PATH + f'{self.sw_vars_file_name}', 'a') as f:
                 yaml.dump(self.sw_vars, f, default_flow_style=False)
         else:
-            with open(GEN_SOFTWARE_PATH + 'software-vars.yml', 'w') as f:
+            with open(GEN_SOFTWARE_PATH + f'{self.sw_vars_file_name}', 'w') as f:
                 f.write('# Do not edit this file. This file is autogenerated.\n')
-            with open(GEN_SOFTWARE_PATH + 'software-vars.yml', 'a') as f:
+            with open(GEN_SOFTWARE_PATH + f'{self.sw_vars_file_name}', 'a') as f:
                 yaml.dump(self.sw_vars, f, default_flow_style=False)
         if os.path.isfile(self.vault_pass_file):
             os.remove(self.vault_pass_file)
 
     def README(self):
-        print(bold('\nPowerAI Enterprise software installer module'))
+        print(bold('\nWMLA Enterprise software installer module'))
         text = ('\nThis module installs the Watson Machine Learning Accelerated\n'
                 'Enterprise software to a cluster of OpenPOWER nodes.\n\n'
-                'PowerAI Enterprise installation involves three steps;\n'
+                'WMLA Enterprise installation involves three steps;\n'
                 '\n  1 - Preparation. Prepares the installer node software server.\n'
                 '       The preparation phase may be run multiple times if needed.\n'
                 f'       usage: pup software --prep {self.my_name}\n'
@@ -280,9 +283,8 @@ class software(object):
                 '\n  3 - Installation. Install software on the client nodes\n'
                 f'       usage: pup software --install {self.my_name}\n\n'
                 'Before beginning, the following files should be extracted from the\n'
-                'WatsonMLA Enterprise binary file and present on this node;\n'
-                f'- mldl-repo-local-5.4.0-*.{self.arch}.rpm\n'
-                f'- wmlaa-1.2.1.0*.{self.arch}.rpm\n'
+                'Watson MLA Enterprise binary file and present on this node;\n'
+                f'- ibm-wmla-1.2.0*_{self.arch}.rpm\n'
                 f'- conductor2.3.0.0_{self.arch}.bin\n'
                 '- conductor_entitlement.dat\n'
                 f'- dli-1.2.1.0_{self.arch}.bin\n'
@@ -348,7 +350,7 @@ class software(object):
             # Firewall status
             if item == 'Firewall':
                 cmd = 'firewall-cmd --list-all'
-                resp, err, rc = sub_proc_exec(cmd)
+                resp, _, _ = sub_proc_exec(cmd)
                 if re.search(r'services:\s+.+http', resp):
                     self.state[item] = "Running and configured for http"
                 continue
@@ -356,7 +358,7 @@ class software(object):
             # Nginx web server status
             if item == 'Nginx Web Server':
                 cmd = 'curl -I 127.0.0.1'
-                resp, err, rc = sub_proc_exec(cmd)
+                resp, _, _ = sub_proc_exec(cmd)
                 if 'HTTP/1.1 200 OK' in resp:
                     self.state[item] = 'Nginx is configured and running'
                 continue
@@ -392,14 +394,14 @@ class software(object):
                 continue
 
             # Anaconda Conda-forge repo status
-            for it in ['', 'noarch', 'linux-64', "linux-ppc64le"]:
-                it = 'noarch'if it == '' else it
-                if item == f'Conda-forge {it} Repository':
-                    repodata = glob.glob('/srv/repos/anaconda/conda-forge'
-                                         f'/{it}/repodata.json', recursive=True)
-                    if repodata:
-                        self.state[item] = f'{item} is setup'
-                    continue
+            if item == f'Conda-forge  Repository':
+                repodata_noarch = glob.glob(f'/srv/repos/anaconda/conda-forge'
+                                            '/noarch/repodata.json', recursive=True)
+                repodata = glob.glob(f'/srv/repos/anaconda/conda-forge'
+                                     f'/linux-{self.ana_platform_basename}/repodata.json', recursive=True)
+                if repodata and repodata_noarch:
+                    self.state[item] = f'{item} is setup'
+                continue
 
         exists = True
         if which == 'all':
@@ -424,7 +426,7 @@ class software(object):
 
     def is_firewall_running(self, eval_ver=False, non_int=False):
         cmd = 'systemctl status firewalld.service'
-        resp, err, rc = sub_proc_exec(cmd)
+        resp, _, _ = sub_proc_exec(cmd)
         if 'Active: active (running)' in resp.splitlines()[2]:
             self.log.debug('Firewall is running')
             return True
@@ -435,7 +437,7 @@ class software(object):
         heading1('Setting up firewall')
         fw_err = 0
         cmd = 'systemctl status firewalld.service'
-        resp, err, rc = sub_proc_exec(cmd)
+        resp, _, rc = sub_proc_exec(cmd)
         if 'Active: active (running)' in resp.splitlines()[2]:
             self.log.debug('Firewall is running')
         else:
@@ -680,9 +682,8 @@ class software(object):
         ch = repo.get_action(exists)
         if ch in 'Y':
             # if not exists or ch == 'F':
-            url = repo.get_repo_url(baseurl, alt_url, contains=['ibmai', 'linux',
-                                    f'{self.arch}'], excludes=['noarch', 'main'],
-                                    filelist=['caffe-1.0*'])
+            url = repo.get_repo_url(baseurl, alt_url, contains=['ibm-ai', 'linux', f'{self.arch}'],
+                                    excludes=['noarch', 'main'], filelist=['caffe-1.0*'])
             if url:
                 if not url == baseurl:
                     if '@na.' in url:
@@ -740,7 +741,7 @@ class software(object):
             alt_url = 'http://'
 
         if exists:
-            self.log.info('PowerAI Enterprise license exists already in the POWER-Up '
+            self.log.info('WMLA Enterprise license exists already in the POWER-Up '
                           'server')
 
         if not exists or get_yesno(f'Copy a new {name.title()} file '):
@@ -887,11 +888,11 @@ class software(object):
                                          'E\nD\nR\nS',
                                          'Repository source? ')
             else:
-                ch, item = get_selection('Create from package files in a local Directory\n'
-                                         'Sync from an alternate Repository\n'
-                                         'Skip',
-                                         'D\nR\nS',
-                                         'Repository source? ')
+                ch, _ = get_selection('Create from package files in a local Directory\n'
+                                      'Sync from an alternate Repository\n'
+                                      'Skip',
+                                      'D\nR\nS',
+                                      'Repository source? ')
 
         if ch == 'E':
             repo = PowerupRepo(repo_id, repo_name, proc_family=self.proc_family)
@@ -1005,8 +1006,7 @@ class software(object):
         ch = repo.get_action(exists)
         if ch in 'Y':
             # if not exists or ch == 'F':
-            url = repo.get_repo_url(baseurl, alt_url, contains=['free', 'linux',
-                                    f'{self.arch}'], excludes=['noarch', 'main'],
+            url = repo.get_repo_url(baseurl, alt_url, contains=['free', 'linux', f'{self.arch}'], excludes=['noarch', 'main'],
                                     filelist=['cython-*'])
             if url:
                 if not url == baseurl:
@@ -1052,9 +1052,8 @@ class software(object):
 
         ch = repo.get_action(exists)
         if ch in 'Y':
-            url = repo.get_repo_url(baseurl, alt_url, contains=['main', 'linux',
-                                    f'{self.arch}'], excludes=['noarch', 'free'],
-                                    filelist=['bzip2-*'])
+            url = repo.get_repo_url(baseurl, alt_url, contains=['main', 'linux', f'{self.arch}'],
+                                    excludes=['noarch', 'free'], filelist=['bzip2-*'])
             if url:
                 if not url == baseurl:
                     self.sw_vars[f'{vars_key}-alt-url'] = url
@@ -1192,13 +1191,13 @@ class software(object):
 
         ch = 'S'
         if get_yesno(prompt=pr_str, yesno='Y/n'):
-            ch, item = get_selection(f'Sync required {repo_id} packages from '
-                                     'Enabled YUM repo\n'
-                                     'Create from package files in a local Directory\n'
-                                     'Sync from an alternate Repository\n'
-                                     'Skip',
-                                     'E\nD\nR\nS',
-                                     'Repository source? ')
+            ch, _ = get_selection(f'Sync required {repo_id} packages from '
+                                  'Enabled YUM repo\n'
+                                  'Create from package files in a local Directory\n'
+                                  'Sync from an alternate Repository\n'
+                                  'Skip',
+                                  'E\nD\nR\nS',
+                                  'Repository source? ')
 
         if ch == 'E':
             repo = PowerupRepo(repo_id, repo_name, arch=self.arch)
@@ -1271,11 +1270,11 @@ class software(object):
                     repo_id = input('Enter a repo id (yum short name): ')
                     repo_name = input('Enter a repo name (Descriptive name): ')
 
-                    ch, item = get_selection('Create from files in a directory\n'
-                                             'Create from an RPM file\n'
-                                             'Create from an existing repository',
-                                             'dir\nrpm\nrepo',
-                                             'Repository source? ', allow_none=True)
+                    ch, _ = get_selection('Create from files in a directory\n'
+                                          'Create from an RPM file\n'
+                                          'Create from an existing repository',
+                                          'dir\nrpm\nrepo',
+                                          'Repository source? ', allow_none=True)
                     if ch != 'N':
                         if ch == 'rpm':
                             # prompts user for the location of the rpm file to be loaded into
@@ -1430,20 +1429,19 @@ class software(object):
         if not os.path.exists(GEN_SOFTWARE_PATH):
             os.mkdir(GEN_SOFTWARE_PATH)
         if self.eval_ver:
-            with open(GEN_SOFTWARE_PATH + 'software-vars-eval.yml', 'w') as f:
+            with open(GEN_SOFTWARE_PATH + f'{self.sw_vars_file_name}', 'w') as f:
                 f.write('# Do not edit this file. This file is autogenerated.\n')
-            with open(GEN_SOFTWARE_PATH + 'software-vars-eval.yml', 'a') as f:
+            with open(GEN_SOFTWARE_PATH + f'{self.sw_vars_file_name}', 'a') as f:
                 yaml.dump(self.sw_vars, f, default_flow_style=False)
         else:
-            with open(GEN_SOFTWARE_PATH + 'software-vars.yml', 'w') as f:
+            with open(GEN_SOFTWARE_PATH + f'{self.sw_vars_file_name}', 'w') as f:
                 f.write('# Do not edit this file. This file is autogenerated.\n')
-            with open(GEN_SOFTWARE_PATH + 'software-vars.yml', 'a') as f:
+            with open(GEN_SOFTWARE_PATH + f'{self.sw_vars_file_name}', 'a') as f:
                 yaml.dump(self.sw_vars, f, default_flow_style=False)
 
     def _load_pkglist(self):
         try:
-            self.pkgs = yaml.load(open(GEN_SOFTWARE_PATH +
-                                  f'pkg-lists-{self.base_filename}.yml'))
+            self.pkgs = yaml.load(open(GEN_SOFTWARE_PATH + f'pkg-lists-{self.base_filename}.yml'))
         except IOError:
             self.log.error(f'Error opening the pkg lists file '
                            f'(pkg-lists-{self.base_filename}.yml)')
@@ -1455,11 +1453,9 @@ class software(object):
         # regular extression of [0-9]{0,3} Other asterisks are converted to regular
         # expression of .*
         try:
-            file_lists = yaml.load(open(GEN_SOFTWARE_PATH +
-                                   f'file-lists-{self.base_filename}.yml'))
+            file_lists = yaml.load(open(GEN_SOFTWARE_PATH + f'file-lists-{self.base_filename}.yml'))
         except IOError:
-            self.log.info('Error while reading installation file lists for '
-                          'PowerAI Enterprise')
+            self.log.info('Error while reading installation file lists for WMLA Enterprise')
             sys.exit('exiting')
             input('\nPress enter to continue')
         else:
@@ -1509,13 +1505,13 @@ class software(object):
                    .format(get_ansible_playbook_path(),
                            self.sw_vars['ansible_inventory'],
                            GEN_SOFTWARE_PATH,
-                           GEN_SOFTWARE_PATH + "software-vars-eval.yml"))
+                           GEN_SOFTWARE_PATH + f"{self.sw_vars_file_name}"))
         else:
             cmd = ('{} -i {} {}init_clients.yml --extra-vars "@{}" '
                    .format(get_ansible_playbook_path(),
                            self.sw_vars['ansible_inventory'],
                            GEN_SOFTWARE_PATH,
-                           GEN_SOFTWARE_PATH + "software-vars.yml"))
+                           GEN_SOFTWARE_PATH + f"{self.sw_vars_file_name}"))
         prompt_msg = ""
         if sudo_password is not None:
             cmd += f'--extra-vars "ansible_become_pass={sudo_password}" '
@@ -1596,7 +1592,7 @@ class software(object):
             cmd += f'--extra-vars "ansible_become_pass={ansible_become_pass}" '
         elif os.path.isfile(self.vault_pass_file):
             cmd += f' --vault-password-file {self.vault_pass_file} '
-            cmd += f'--extra-vars "@{GEN_SOFTWARE_PATH}software-vars.yml" '
+            cmd += f'--extra-vars "@{GEN_SOFTWARE_PATH}{self.sw_vars_file_name}" '
         else:
             cmd += ' --ask-become-pass '
         resp, err, rc = sub_proc_exec(cmd, shell=True)
@@ -1640,7 +1636,7 @@ class software(object):
         if self.eval_ver:
             if self.lic_prep_timestamp > self.eval_prep_timestamp:
                 print(bold('You have requested to install the evaluation version'))
-                print('of PowerAI Enterprise but last ran preparation for ')
+                print('of WMLA Enterprise but last ran preparation for ')
                 print('licensed version.')
                 resp = get_yesno('Continue with evaluation installation ')
                 if not resp:
@@ -1648,7 +1644,7 @@ class software(object):
         else:
             if self.eval_prep_timestamp > self.lic_prep_timestamp:
                 print(bold('You have requested to install the licensed version'))
-                print('of PowerAI Enterprise but last ran preparation for ')
+                print('of WMLA Enterprise but last ran preparation for ')
                 print('evaluation version.')
                 resp = get_yesno('Continue with licensed installation ')
                 if not resp:
@@ -1712,14 +1708,14 @@ class software(object):
                    f'{self.sw_vars["ansible_inventory"]} '
                    f'{GEN_SOFTWARE_PATH}{self.my_name}_ansible/run.yml {verbose} '
                    f'--extra-vars "task_file={GEN_SOFTWARE_PATH}{tasks_path}" '
-                   f'--extra-vars "@{GEN_SOFTWARE_PATH}software-vars-eval.yml" '
+                   f'--extra-vars "@{GEN_SOFTWARE_PATH}{self.sw_vars_file_name}" '
                    f'{extra_args}')
         else:
             cmd = (f'{get_ansible_playbook_path()} -i '
                    f'{self.sw_vars["ansible_inventory"]} '
                    f'{GEN_SOFTWARE_PATH}{self.my_name}_ansible/run.yml {verbose} '
                    f'--extra-vars "task_file={GEN_SOFTWARE_PATH}{tasks_path}" '
-                   f'--extra-vars "@{GEN_SOFTWARE_PATH}software-vars.yml" '
+                   f'--extra-vars "@{GEN_SOFTWARE_PATH}{self.sw_vars_file_name}" '
                    f'{extra_args}')
         run = True
         while run:

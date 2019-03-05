@@ -22,8 +22,9 @@ import yaml
 import argparse
 import lib.logger as logger
 import lib.genesis as gen
-from engr_mode import validate_at_time, validate_soft_type, validate_environment, setup_logging
-from engr_mode import exit, RC_SUCCESS, RC_ERROR, RC_ARGS, RC_USER_EXIT, RC_PERMISSION
+from engr_mode import setup_logging
+from engr_mode import exit, RC_SUCCESS, RC_ARGS, RC_USER_EXIT
+import logging
 
 dep_path = gen.get_dependencies_path()
 
@@ -35,6 +36,7 @@ except:
     LOG = logging.getLogger(__name__)
     setup_logging()
     STANDALONE = True
+
 pip_pre_files = ['client_pip_pre_install.txt',
                  'dlipy3_pip_pre_install.txt',
                  'dlipy2_pip_pre_install.txt',
@@ -61,6 +63,7 @@ yum_pre_files = ['client_yum_pre_install.txt']
 
 yum_post_files = ['client_yum_post_install.txt']
 
+
 def file_check(pre_files):
     for f in pre_files:
         pre_file_path = os.path.join(dep_path, f)
@@ -79,6 +82,7 @@ def file_check(pre_files):
                     sys.exit()
                 else:
                     print('\nPlese select a valid option')
+
 
 def format_pkg_name(pkg, pkg_type):
     if pkg_type == 'yum':
@@ -102,7 +106,7 @@ def format_pkg_name(pkg, pkg_type):
         if pkg_repo is not None:
             pkg_repo = pkg_repo.rpartition('/')[-1]
         else:
-            print("pkg_type: {0}\n pkg_fmt_name: {1}".format(pkg_type,pkg_fmt_name))
+            print("pkg_type: {0}\n pkg_fmt_name: {1}".format(pkg_type, pkg_fmt_name))
     elif pkg_type == 'pip':
         pkg_items = pkg.split()
         pkg_repo = 'pip'
@@ -111,6 +115,7 @@ def format_pkg_name(pkg, pkg_type):
         pkg_fmt_name = pkg_items[0] + '=' + version
 
     return pkg_fmt_name, pkg_repo
+
 
 def write_merged_files(merged_sets, pkg_type):
     if pkg_type == 'yum':
@@ -138,6 +143,8 @@ def write_merged_files(merged_sets, pkg_type):
             with open(file_path, 'w') as f:
                 d = {file_name: sorted(merged_sets[repo])}
                 yaml.dump(d, f, indent=4, default_flow_style=False)
+
+
 def get_repo_list(pkgs, pkg_type):
     repo_list = []
     if pkg_type == 'yum':
@@ -168,6 +175,7 @@ def get_repo_list(pkgs, pkg_type):
                 repo_list.append(repo)
 
     return repo_list
+
 
 def merge_function(pre_files, post_files, pkg_type):
 
@@ -238,12 +246,14 @@ def merge_function(pre_files, post_files, pkg_type):
 
     write_merged_files(merged_sets, pkg_type)
 
+
 def do_call_merge_function(args):
-    soft_type = args.soft_type 
-    environment = args.environment 
+    soft_type = args.soft_type
+    environment = args.environment
     merge_function([f"{soft_type}_{environment}_pre_install.txt"],
                    [f"{soft_type}_{environment}_post_install.txt"],
                    environment)
+
 
 def parse_input(args):
     parser = argparse.ArgumentParser(description="Utility for merging packages")
@@ -258,7 +268,7 @@ def parse_input(args):
                 sub_parser.add_argument("--" + arg,
                                         help=arg_help, required=required,
                                         type=globals()["validate_" + arg])
-            sub_parser.set_defaults(func=globals()["do_"+cmd])
+            sub_parser.set_defaults(func=globals()["do_" + cmd])
 
         sub_parser.add_argument('-ll', '--loglevel', type=str,
                                 choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
@@ -267,7 +277,7 @@ def parse_input(args):
 
     add_subparser('call_merge_function', "call merege function",
                   [('soft_type', 'dlipy2, dlipy3, dlinsights', True),
-                    ('environment', 'pip or conda', True)])
+                   ('environment', 'pip or conda', True)])
 
     if not args:
         parser.print_help()
@@ -283,26 +293,27 @@ def main(args):
 
     log = logger.getlogger()
     log.debug('log this')
-    
+
     # merge_function(yum_pre_files, yum_post_files, 'yum')
     # merge_function(conda_pre_files, conda_post_files, 'conda')
     if args:
         try:
             parsed_args = parse_input(args)
             LOG.info("Running operation '%s'", ' '.join(args))
-            parsed_args.func(parsed_args) exit(RC_SUCCESS, "Operation %s completed successfully" % args[0])
+            parsed_args.func(parsed_args)
+            exit(RC_SUCCESS, "Operation {0} completed successfully".format(args[0]))
         except KeyboardInterrupt as k:
             exit(RC_USER_EXIT, "Exiting at user request ... {0}".format(k))
     else:
         file_check(pip_pre_files)
         file_check(pip_post_files)
-         #  merge_function(yum_pre_files, yum_post_files, 'yum')
+        # merge_function(yum_pre_files, yum_post_files, 'yum')
         merge_function(conda_pre_files, conda_post_files, 'conda')
-        #  merge_function(pip_pre_files, pip_post_files, 'pip')
+        # merge_function(pip_pre_files, pip_post_files, 'pip')
 
 
 if __name__ == '__main__':
-    """ Get Files from Depencey Packaging 
+    """ Get Files from Depencey Packaging
     """
     STANDALONE = True
     main(sys.argv[1:])
