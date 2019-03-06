@@ -419,11 +419,6 @@ def get_args(parser_args=False):
                  'epel_repo', 'custom_repo'],
         help='Runs the software phase with specified step')
 
-    parser_software.add_argument(
-        '--get_state',
-        default=None,
-        action="store_true",
-        help='Get state of prep phase')
     # 'utils' subcommand arguments
     parser_utils.set_defaults(utils=True)
     parser_utils.add_argument(

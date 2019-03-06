@@ -717,12 +717,7 @@ class Gen(object):
             else:
                 soft = software_module.software(self.args.eval, self.args.non_interactive, self.args.arch)
             try:
-                if (self.args.prep is True or self.args.all is True) and self.args.get_state is not None:
-                    try:
-                        soft.status_prep()
-                    except AttributeError as exc:
-                        print(exc)
-                elif (self.args.prep is True or self.args.all is True) and self.args.step is not None:
+                if (self.args.prep is True or self.args.all is True) and self.args.step is not None:
                     try:
                         soft.prep_init()
                         for step in self.args.step:
