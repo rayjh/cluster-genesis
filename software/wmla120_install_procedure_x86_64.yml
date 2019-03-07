@@ -31,7 +31,7 @@
  #tasks: wmla_license_check.yml
 
 - description: Configure a system for IBM Spectrum Conductor Deep Learning Impact
-  tasks: configure_spectrum_conductor.yml
+  tasks: configure_spectrum_conductor_x86_64.yml
 
 - description: Install IBM Spectrum Conductor
   tasks: install_spectrum_conductor_with_spark.yml
