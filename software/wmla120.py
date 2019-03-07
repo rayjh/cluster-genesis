@@ -665,13 +665,13 @@ class software(object):
                     self.sw_vars[f'{vars_key}-alt-url'] = _url
 
                 # accept_list is used for linux_{self.arch}, reject_list for noarch
-                if 'accept_list' in self.pkgs[f'ibm_ai_conda_linux_{self.ana_platform_basename}']:
-                    al = self.pkgs[f'ibm_ai_conda_linux_{self.ana_platform_basename}']['accept_list']
+                if 'accept_list' in self.pkgs[f'ibm_ai_conda_linux_{self.arch}']:
+                    al = self.pkgs[f'ibm_ai_conda_linux_{self.arch}']['accept_list']
                 else:
                     al = None
 
-                if 'reject_list' in self.pkgs[f'ibm_ai_conda_linux_{self.ana_platform_basename}']:
-                    rl = self.pkgs[f'ibm_ai_conda_linux_{self.ana_platform_basename}']['reject_list']
+                if 'reject_list' in self.pkgs[f'ibm_ai_conda_linux_{self.arch}']:
+                    rl = self.pkgs[f'ibm_ai_conda_linux_{self.arch}']['reject_list']
                 else:
                     rl = None
 
