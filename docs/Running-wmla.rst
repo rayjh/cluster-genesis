@@ -1,7 +1,7 @@
 .. _running_paie:
 
 Running the Watson Machine Learning (WML) Accelerator Software Install Module
-===================================================================
+=============================================================================
 
 Overview
 --------
@@ -42,12 +42,12 @@ POWER-Up Node  Prerequisites;
     # On POWER9::
 
        $ sudo subscription-manager repos --enable=rhel-7-for-power-9-rpms --enable=rhel-7-for-power-9-optional-rpms --enable=–enable=rhel-7-for-power-9-extras-rpms
-    
+
     # On x86_64::
 
        $ subscription-manager repos --enable "rhel-*-optional-rpms" --enable "rhel-*-extras-rpms"  --enable "rhel-ha-for-rhel-*-server-rpms"
 
-#. Insure that there is at least 45 GB of available disk space in the partition holding the /srv directory::
+#. Insure that there is at least 16 GB of available disk space in the partition holding the /srv directory::
 
     $ df -h /srv
 
@@ -61,13 +61,13 @@ POWER-Up Node  Prerequisites;
    "1.1.1", "software-install-b2.10", "Updates for x86 based installer node"
    "1.1.1", "software-install-b2.11", "Enable cuda replicate on x86 installer node"
    "1.1.2", "software-install-b2.12", "Support for installation of PAIE 1.1.2"
-   "1.2.0", "wmla120",                "Support for installation of WMLA 1.2.0"
+   "1.2.0", "software-install-1.0", "Support for installation of WMLA 1.2.0"
 
 From your home directory install the POWER-Up software and initialize the environment. For additional information see :ref:`installing`::
 
     $ sudo yum install git
 
-    $ git clone https://github.com/open-power-ref-design-toolkit/power-up -b wmla120 
+    $ git clone https://github.com/open-power-ref-design-toolkit/power-up -b software-install-1.0
 
     $ cd power-up
 
@@ -77,9 +77,9 @@ From your home directory install the POWER-Up software and initialize the enviro
 
 **NOTES:**
 
-- The latest functional enhancements and defect fixes can be obtained by cloning the software installer without specifying the tag release. Generally, you should use a release level specified in the table above unless you are experiencing problems.::
+- The latest functional enhancements and defect fixes can be obtained by cloning the software installer without specifying the branch release. Generally, you should use a release level specified in the table above unless you are experiencing problems.::
 
-    git clone https://github.com/open-power-ref-design-toolkit/power-up -b wmla120 
+    git clone https://github.com/open-power-ref-design-toolkit/power-up
 
 - Multiple users can install and use the WMLA installer software, however there is only one software server created and there are no safeguards built in to protect against concurrent modifications of the software server content, data files or client nodes.
 - Each user of the WMLA installer software must install the POWER-Up software following the steps above.
@@ -252,7 +252,7 @@ To uninstall the POWER-Up software and remove the software repositories, follow 
     $ sudo rm -rf /srv/repos
 
 #. Remove the yum cache data depending on Computer Architecture::
-    
+
     $ sudo rm -rf /var/cache/yum/${PLATFORM}/7Server/cuda/
     $ sudo rm -rf /var/cache/yum/${PLATFORM}/7Server/cuda-local/
     $ sudo rm -rf /var/cache/yum/${PLATFORM}/7Server/dependencies/

@@ -33,7 +33,7 @@ Welcome to POWER-Up User's Guide documentation!
    Run-Cluster-Genesis
    Run-Software-Install
    Creating-Software-Install-Modules
-   Running-paie
+   Running-wmla
    Config-Specification
    Inventory-Specification
    Multi-Tenant
