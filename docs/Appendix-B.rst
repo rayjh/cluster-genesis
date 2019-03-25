@@ -9,7 +9,9 @@ This abbreviated instruction list is for advanced users already familiar with th
 
 #. Prepare the Client Nodes by completing the 'Setup for automated installer steps' at https://www.ibm.com/support/knowledgecenter/SSFHA8_1.2.0/wmla_auto_install_setup.html
 
-#. Enable EPEL repositories. (https://fedoraproject.org/wiki/EPEL#Quickstart)
+#. Enable EPEL repositories. (https://fedoraproject.org/wiki/EPEL#Quickstart)::
+
+    yum install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm::
 
 #. Enable Red Hat common, optional and extras repositories.
 
@@ -35,6 +37,15 @@ This abbreviated instruction list is for advanced users already familiar with th
 
     . miniconda2/etc/profile.d/conda.sh
     conda activate base
+
+#. Extract WMLA. Assuming the WMLA binary is in /home/user/wmla120bin::
+
+    cd /home/user/wmla120bin
+    bash ibm-wmla-1.2.0_ppc64le.bin
+
+    for x86
+
+    bash ibm-wmla-1.2.0_x86_64.bin
 
 #. Deactivate Conda::
 

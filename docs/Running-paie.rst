@@ -24,6 +24,10 @@ Questions regarding the WML Accelerator installation software, installation, or 
 
 Answered questions regarding PowerAI can be viewed at https://developer.ibm.com/answers/topics/powerai/
 
+For Advanced Users
+------------------
+User's experienced with the WMLA installation process may find the advanced user instructions useful. :ref:`appendix_b`
+
 Set up of the POWER-Up Software Installer Node
 ----------------------------------------------
 
@@ -105,7 +109,7 @@ Before beginning automated installation, you should have completed the 'Setup fo
 Before proceeding with preparation of the POWER-Up server, you will need to gather the following information;
 
 -  Fully qualified domain name (FQDN) for each client node
--  Userid and password or private ssh key for accessing the client nodes. Note that for running an automated installation, the same user id and password must exist on all client nodes and must be configured with sudo access. The PowerUp software installer uses passwordless ssh access during the install. If an ssh key is not availabl one will be generated and distributed to all the cluster nodes.
+-  Userid and password or private ssh key for accessing the client nodes. Note that for running an automated installation, the same user id and password must exist on all client nodes and must be configured with sudo access. The PowerUp software installer uses passwordless ssh access during the install. If an ssh key is not available one will be generated and distributed to all the cluster nodes.
 
 Copy or Extract the WMLA software packages onto the PowerUp installation node.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -120,7 +124,7 @@ On a Power node::
 
     wget https://repo.anaconda.com/miniconda/Miniconda2-latest-Linux-ppc64le.sh
 
-install Minconda (installs to minconda2/ under the current user directory)::
+Install Minconda (installs to minconda2/ under the current user directory)::
 
     bash Miniconda2-latest-Linux-ppc64le.sh
 
@@ -155,7 +159,7 @@ These can be accessed using the public internet (URL's are 'built-in') or from a
 **NOTES:**
 
 -  Extraction and license acceptance of WML Accelerator must be performed on the same hardware architecture as the intended target nodes. If you are running the POWER-Up installer software on an x_86 node, you must first extract the files on an OpenPOWER node and then copy all of the extracted contents to the POWER-Up installer node.
-- Red Hat dependent packages are unuique to Power8, Power9 and x86 and must be downloaded on the target architecture. If you are running the WML Accelerator installer on a different architecture than the architecture of your cluster nodes, you must download the Red Hat dependent packages on a node of the same architecture as your cluster and then copy them to a directory on the installer node. A utility script is included to facilitate this process. To use the script, insure you have ssh access with sudo privileges to an appropriate node which has a subscription to the Red Hat 'common', 'optional' and 'extras' channels. (One of the cluster nodes or any other suitable node can be used for this purpose). To run the script from the power-up directory on the installer node::
+- Red Hat dependent packages are unique to Power8, Power9 and x86 and must be downloaded on the target architecture. If you are running the WML Accelerator installer on a different architecture than the architecture of your cluster nodes, you must download the Red Hat dependent packages on a node of the same architecture as your cluster and then copy them to a directory on the installer node. A utility script is included to facilitate this process. To use the script, insure you have ssh access with sudo privileges to an appropriate node which has a subscription to the Red Hat 'common', 'optional' and 'extras' channels. (One of the cluster nodes or any other suitable node can be used for this purpose). To run the script from the power-up directory on the installer node::
 
     ./software/get-dependent-packages.sh userid hostname arch
 
@@ -174,7 +178,7 @@ To use the automated installer with the evaluation version of WML Accelerator, i
 
     $ pup software --status --eval wmla*
 
-Note: The POWER-Up software installer runs python installation modules. Inclusion of the '.py' in the software module name is optional. ie For WML Accelerator version 1.1.1, paie111 or paie111.py are both acceptable.
+Note: The POWER-Up software installer runs python installation modules. Inclusion of the '.py' in the software module name is optional. ie For WML Accelerator version 1.1.1, wmla120 or wmla120.py are both acceptable.
 
 **Hint: The POWER-Up command line interface supports tab autocompletion.**
 
