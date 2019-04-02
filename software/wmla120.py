@@ -337,10 +337,21 @@ class software(object):
 
             # Nginx web server status
             if item == 'Nginx Web Server':
-                cmd = 'curl -I 127.0.0.1'
-                resp, _, _ = sub_proc_exec(cmd)
-                if 'HTTP/1.1 200 OK' in resp:
-                    self.state[item] = 'Nginx is configured and running'
+                temp_dir = 'nginx-test-dir-123'
+                abs_temp_dir = os.path.join(self.root_dir, temp_dir)
+                try:
+                    os.mkdir(abs_temp_dir)
+                except:
+                    pass
+                else:
+                    cmd = f'curl -I http://127.0.0.1/{temp_dir}/'
+                    resp, _, _ = sub_proc_exec(cmd)
+                    if 'HTTP/1.1 200 OK' in resp:
+                        self.state[item] = 'Nginx is configured and running'
+                try:
+                    os.rmdir(abs_temp_dir)
+                except:
+                    pass
                 continue
 
             # IBM AI Repo Free status
