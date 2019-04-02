@@ -342,12 +342,16 @@ class software(object):
                 try:
                     os.mkdir(abs_temp_dir)
                 except:
-                    pass
+                    self.log.error('Failed trying to create temporary directory '
+                                   f'{abs_temp_dir}')
                 else:
                     cmd = f'curl -I http://127.0.0.1/{temp_dir}/'
                     resp, _, _ = sub_proc_exec(cmd)
                     if 'HTTP/1.1 200 OK' in resp:
                         self.state[item] = 'Nginx is configured and running'
+                    else:
+                        self.log.error('Nginx web server is unable to access '
+                                       f'test directory {abs_temp_dir}.')
                 try:
                     os.rmdir(abs_temp_dir)
                 except:
