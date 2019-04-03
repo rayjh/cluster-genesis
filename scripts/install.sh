@@ -18,7 +18,7 @@
 set -e
 source /etc/os-release
 arch=$(uname -m)
-is_p9=$(lscpu|grep POWER9)
+is_p9=$(lscpu|grep POWER9) || true
 
 rhel_docker_ce_repo="[docker]
 name=Docker
