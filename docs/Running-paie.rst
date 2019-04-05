@@ -57,13 +57,14 @@ POWER-Up Node  Prerequisites;
    :header: "WML Accelerator Release", "POWER-Up software installer vs", "Notes", "EOL date"
 
    "1.1.2", "software-install-b2.12", "Support for installation of PAIE 1.1.2"
-   "1.2.0", "wmla120-1.0", "Support for installation of WMLA 1.2.0"
+   "1.2.0", "wmla120-1.0.0", "Support for installation of WMLA 1.2.0"
+   "1.2.0", "wmla120-1.0.1", "Support for installation of WMLA 1.2.0"
 
 From your home directory install the POWER-Up software and initialize the environment. For additional information see :ref:`installing`::
 
     $ sudo yum install git
 
-    $ git clone https://github.com/open-power-ref-design-toolkit/power-up -b wmla120-1.0
+    $ git clone https://github.com/open-power-ref-design-toolkit/power-up -b wmla120-1.0.1
 
     $ cd power-up
 
