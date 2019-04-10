@@ -28,6 +28,7 @@ from shutil import copy2, rmtree
 import calendar
 import time
 import yaml
+from orderedattrdict.yamlutils import AttrDictYAMLLoader
 import json
 from getpass import getpass
 import pwd
@@ -88,6 +89,7 @@ class software(object):
                         'Python Package Repository': 'pypi',
                         'CUDA Driver Repository': 'cuda'}
 
+        self._load_content()
         self._load_pkglist()
 
         try:
@@ -1358,6 +1360,16 @@ class software(object):
             with open(GEN_SOFTWARE_PATH + f'{self.sw_vars_file_name}', 'a') as f:
                 yaml.dump(self.sw_vars, f, default_flow_style=False)
 
+    def _load_content(self):
+        try:
+            self.content = yaml.load(open(GEN_SOFTWARE_PATH +
+                                     f'content-{self.base_filename}.yml'),
+                                     Loader=AttrDictYAMLLoader)
+        except IOError:
+            self.log.error(f'Error opening the content list file '
+                           f'(content-{self.base_filename}.yml)')
+            sys.exit('Exit due to critical error')
+
     def _load_pkglist(self):
         try:
             self.pkgs = yaml.load(open(GEN_SOFTWARE_PATH + f'pkg-lists-{self.base_filename}.yml'))
@@ -1568,6 +1580,108 @@ class software(object):
                     sys.exit('Exiting')
                     sys.exit(1)
 
+    def _get_file_paths(self, fileglob):
+        """ Searches under the software server's root directory for the
+        given fileglob.
+        Args:
+            fileglob (str): String with a bash style file glob.
+        Returns: A list of sorted paths. For rpm files, the newest version
+        will be last
+        """
+        paths = glob.glob(f'{self.root_dir}**/{fileglob}')
+        paths = sorted(paths)
+        return paths
+
+    def _get_yum_repo_dirs(self, repo_id):
+        _dirglob = os.path.join(f'{self.root_dir}', 'repos', f'{repo_id}',
+                                '**', 'repodata')
+        paths = glob.glob(_dirglob, recursive=True)
+        paths = [path.rstrip('repodata') for path in paths]
+        if self.proc_family:
+            paths = [path for path in paths if self.proc_family in path]
+        return paths
+
+    def _get_conda_repo_dirs(self, repo_id, repo_name):
+        if 'Main' in repo_name:
+            name = 'main'
+        elif 'Free' in repo_name:
+            name = 'free'
+        else:
+            name = ''
+        _dirglob = os.path.join(f'{self.root_dir}', 'repos', f'{repo_id}',
+                                '**', f'{name}', f'linux-{self.arch}', '')
+        paths = glob.glob(_dirglob, recursive=True)
+        paths = [path.rstrip('/') for path in paths]
+        paths = [path.rstrip(f'linux-{self.arch}') for path in paths]
+        return paths
+
+    def _update_software_vars(self):
+        # from pdb import set_trace
+        # set_trace()
+        for _item in self.content:
+            item = self.content[_item]
+            if item.type == 'file':
+                _glob = item.fileglob_eval if self.eval_ver else item.fileglob
+                paths = self._get_file_paths(_glob)
+
+                if len(set(paths)) != 1:
+                    release_lvl_file = item.filename_eval if self.eval_ver \
+                        else item.filename
+                    print(f'Multiple files matching the requirement for\n {_glob}\nare '
+                          'present in the PowerUp software server. The release level\n'
+                          f'is: {release_lvl_file}\n'
+                          'Please select a file for this WMLA installation.')
+                    ch, path = get_selection(paths)
+                elif len(paths) == 1:
+                    path = paths[0]
+                else:
+                    self.log.error(f'No {_glob} found in software server.')
+                    path = ''
+                self.sw_vars['content_files'][_item.replace('_', '-')] = path
+                # set_trace()
+                print(path)
+            elif item.type == 'conda':
+                repo_id = item.repo_id
+                repo_name = item.repo_name
+                dirs = self._get_conda_repo_dirs(repo_id, repo_name)
+                print(dirs)
+                if len(dirs) == 1:
+                    _dir = dirs[0]
+                else:
+                    msg = (f'More than one {item.name} repository exists in the\n'
+                           'PowerUp software server. Please select the repository '
+                           'to use for this WMLA installation.')
+                    print(msg)
+                    ch, _dir = get_selection(dirs)
+                _dir = _dir[len(self.root_dir) - 1:]
+                # form .condarc channel entry. Note that conda adds
+                # the corresponding 'noarch' channel automatically.
+                channel = f'  - http://{{{{ host_ip.stdout }}}}{_dir}'
+                if channel not in self.sw_vars['ana_powerup_repo_channels']:
+                    self.sw_vars['ana_powerup_repo_channels'].append(channel)
+
+            elif item.type == 'yum':
+                repo_id = item.repo_id.format(arch=self.arch)
+                repo_name = item.repo_name.format(arch=self.arch)
+                dirs = self._get_yum_repo_dirs(repo_id)
+                print(dirs)
+                if len(dirs) == 1:
+                    _dir = dirs[0]
+                else:
+                    msg = (f'More than one {item.name} repository exists in the\n'
+                           'PowerUp software server. Please select the repository '
+                           'to use for this WMLA installation.')
+                    print(msg)
+                    ch, _dir = get_selection(dirs)
+                _dir = _dir.rstrip('/')
+                repo = PowerupRepo(repo_id, repo_name, self.arch,
+                                   self.proc_family)
+                dotrepo_content = repo.get_yum_dotrepo_content(repo_dir=_dir,
+                                                               gpgcheck=0,
+                                                               client=True)
+                filename = repo_id + '-powerup.repo'
+                self.sw_vars['yum_powerup_repo_files'][filename] = dotrepo_content
+
     def install(self):
         print()
         if self.eval_ver:
@@ -1586,6 +1700,10 @@ class software(object):
                 resp = get_yesno('Continue with licensed installation ')
                 if not resp:
                     sys.exit('Installation ended by user')
+
+        self._update_software_vars()
+        from pdb import set_trace
+        set_trace()
 
         if self.sw_vars['ansible_inventory'] is None:
             self.sw_vars['ansible_inventory'] = get_ansible_inventory()
