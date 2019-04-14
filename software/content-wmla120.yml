@@ -5,12 +5,10 @@ anaconda:
     dtype: file-.sh
     filename: Anaconda3-2018.12-Linux-{arch}.sh
     fileglob: Anaconda3-20[1-2][8-9].[1-9][2-9]*-Linux-{arch}.sh
-    filename_eval: Anaconda3-2018.12-Linux-{arch}.sh
-    fileglob_eval: Anaconda3-20[1-2][8-9].[1-9][2-9]*-Linux-{arch}.sh
     ftype: file
     help: Anaconda installer file. Contains the Anaconda3 install
-    license_file: None
-    license_for: None
+    license_file:
+    license_for:
     name: Anaconda  # Generally for display / prompting purposes
     path: anaconda  # path under the nginx root location
     type: file

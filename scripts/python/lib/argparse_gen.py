@@ -413,6 +413,7 @@ def get_args(parser_args=False):
         nargs='+',
         choices=['ibmai_repo', 'cuda_drv_repo',
                  'wmla_license', 'spectrum_dli',
+                 'spectrum_conductor',
                  'dependency_repo', 'conda_content_repo',
                  'conda_free_repo', 'conda_main_repo',
                  'conda_forge_repo', 'pypi_repo',
@@ -425,7 +426,7 @@ def get_args(parser_args=False):
         nargs='+',
         choices=['p8', 'p9', 'x86_64'],
         help='Set the target processor family')
-    
+
     parser_software.add_argument(
         '--engr-mode',
         default=False,

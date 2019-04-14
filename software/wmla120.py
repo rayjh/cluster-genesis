@@ -34,7 +34,6 @@ from getpass import getpass
 import pwd
 import grp
 import click
-from pdb import set_trace
 
 import lib.logger as logger
 from repos import PowerupRepo, PowerupRepoFromDir, PowerupYumRepoFromRepo, \
@@ -66,12 +65,12 @@ class software(object):
         self.log_lvl = logger.get_log_level_print()
         self.my_name = sys.modules[__name__].__name__
         self.rhel_ver = '7'
-        self.root_dir = '/srv/'
-
+        self.arch = arch
+        self.root_dir_nginx = '/srv'
+        self.root_dir = f'{self.root_dir_nginx}/{self.my_name}-{arch}/'
         self.yum_powerup_repo_files = []
         self.eval_ver = eval_ver
         self.non_int = non_int
-        self.arch = arch
 
         if isinstance(proc_family, list):
             self.proc_family = proc_family[0]
@@ -138,8 +137,6 @@ class software(object):
                 isinstance(self.sw_vars['content_files'], dict)):
             self.sw_vars['content_files'] = {}
 
-        #self._update_software_vars()
-
         self.epel_repo_name = self.repo_id['EPEL Repository']
         self.sw_vars['epel_repo_name'] = self.epel_repo_name
         self.sw_vars['rhel_ver'] = self.rhel_ver
@@ -193,7 +190,6 @@ class software(object):
 
     def status(self, which='all'):
         self._update_software_vars()
-        #set_trace()
         self.status_prep(which)
         self.prep_post()
 
@@ -201,7 +197,6 @@ class software(object):
         self.state = {}
 
         def yum_repo_status(item):
-            #set_trace()
             repo_id = item.repo_id.format(arch=self.arch)
             search_dir = f'{self.root_dir}repos/{repo_id}/**/repodata'
             repodata = glob.glob(search_dir, recursive=True)
@@ -214,7 +209,6 @@ class software(object):
 
         def content_status(item):
             ver_mis = False
-            #set_trace()
             item_dir = item.path
             if self.eval_ver:
                 fileglob = item.fileglob_eval.format(arch=self.arch)
@@ -225,17 +219,17 @@ class software(object):
             sw_vars_data = item_dir in self.sw_vars['content_files']
 
             if exists and sw_vars_data:
+                name = item.name
                 if not item.license_for:
-                    name = item.name + ' content'
                     if exists[0] in self.sw_vars['content_files'][item_dir]:
-                        self.state[name] = ('Present in the POWER-Up server')
+                        self.state[name] = ('Present')
                     else:
                         ver_mis = True
                         self.state[name] = (Color.yellow +
                                             'Present but not at release level' +
                                             Color.endc)
                 else:
-                    self.state[item.name] = ('Present in the POWER-Up server')
+                    self.state[item.name] = ('Present')
             else:
                 self.state[item.name] = '-'
             return ver_mis
@@ -243,7 +237,6 @@ class software(object):
         def conda_repo_status(item):
             repo_id = item.repo_id
             repo_name = item.repo_name
-            #set_trace()
             if 'Main' in repo_name:
                 name = 'main'
             elif 'Free' in repo_name:
@@ -255,7 +248,7 @@ class software(object):
             path_lin = glob.glob(dirglob_lin, recursive=True)
 
             dirglob_na = os.path.join(f'{self.root_dir}', 'repos', f'{repo_id}',
-                                       '**', f'{name}', 'noarch', '')
+                                      '**', f'{name}', 'noarch', '')
             path_na = glob.glob(dirglob_na, recursive=True)
 
             in_channel_list = False
@@ -279,18 +272,18 @@ class software(object):
 
             # yum repos status
             if item.type == 'yum':
-                #set_trace()
                 yum_repo_status(item)
                 continue
 
             if item.type == 'conda':
-                #set_trace()
                 conda_repo_status(item)
 
             if item.type == 'simple':
-                if os.path.exists(f'/srv/repos/{item.repo_id}/simple/') and \
-                        len(os.listdir(f'/srv/repos/{item.repo_id}/simple/')) >= 1:
+                if os.path.exists(f'{self.root_dir}repos/{item.repo_id}/simple/') and \
+                        len(os.listdir(f'{self.root_dir}repos/{item.repo_id}/simple/')) >= 1:
                     self.state[item.desc] = 'Setup'
+                else:
+                    self.state[item.desc] = '-'
                 continue
 
         # Firewall status
@@ -305,7 +298,7 @@ class software(object):
         item = 'Nginx Web Server'
         if item == 'Nginx Web Server':
             temp_dir = 'nginx-test-dir-123'
-            abs_temp_dir = os.path.join(self.root_dir, temp_dir)
+            abs_temp_dir = os.path.join(self.root_dir_nginx, temp_dir)
             test_file = 'test-file.abc'
             test_path = os.path.join(abs_temp_dir, test_file)
             try:
@@ -313,7 +306,7 @@ class software(object):
                 os.mkdir(abs_temp_dir)
                 # os.mknod(test_file)
                 with open(test_path, 'x') as f:
-                    pass
+                    f.close
             except:
                 self.log.error('Failed trying to create temporary file '
                                f'{test_path}. Check access privileges')
@@ -354,7 +347,6 @@ class software(object):
                     gtg = f'{Color.red}Preparation incomplete{Color.endc}'
             print(f'\n{bold(gtg)}\n')
         else:
-            #set_trace()
             exists = self.state[which] != '-'
 
         return exists
@@ -403,7 +395,7 @@ class software(object):
         heading1('Set up Nginx')
         exists = self.status_prep(which='Nginx Web Server')
         if not exists:
-            nginx_setup(root_dir='/srv', repo_id='nginx')
+            nginx_setup(root_dir=self.root_dir_nginx, repo_id='nginx')
 
         self.status_prep(which='Nginx Web Server')
         if self.state['Nginx Web Server'] == '-':
@@ -416,10 +408,6 @@ class software(object):
         # and the package list can be downloaded from there or alternately the
         # cuda packages repo can be created from a local directory or an
         # existing repository on another node.
-        # repo_id = 'cuda'
-        # repo_name = 'Cuda Driver Repository'
-        # baseurl = f'http://developer.download.nvidia.com/compute/cuda/repos/rhel7/{self.arch}'
-        # gpgkey = f'{baseurl}/7fa2af80.pub'
         name = 'cuda_driver'
         _repo = self.content[name]
         repo_id = _repo.repo_id
@@ -464,17 +452,14 @@ class software(object):
 
         if ch == 'P':
             # Enable the public repo
-            repo_cuda = PowerupRepo(repo_id, repo_name, arch=self.arch)
+            repo_cuda = PowerupRepo(repo_id, repo_name, self.root_dir, arch=self.arch)
             dot_repo_content = repo_cuda.get_yum_dotrepo_content(url=baseurl, gpgkey=gpgkey)
             repo_cuda.write_yum_dot_repo_file(dot_repo_content)
 
-            repo = PowerupRepo(repo_id, repo_name)
+            repo = PowerupRepo(repo_id, repo_name, self.root_dir, arch=self.arch)
             repo_dir = repo.get_repo_dir()
             self._add_dependent_packages(repo_dir, pkg_list, also_get_newer=False)
             repo.create_meta()
-            #content = repo.get_yum_dotrepo_content(gpgcheck=0, client=True)
-            #filename = repo_id + '-powerup.repo'
-            #self.sw_vars['yum_powerup_repo_files'][filename] = content
 
         elif ch == 'rpm':
             # prompts user for the location of the rpm file to be loaded into
@@ -482,7 +467,7 @@ class software(object):
             # contents of the rpm file are then extracted under /srv/repos/
             # Meta data is created. yum.repo content is generated and added to
             # the software-vars.yml file
-            repo = PowerupRepoFromRpm(repo_id, repo_name, arch=self.arch)
+            repo = PowerupRepoFromRpm(repo_id, repo_name, self.root_dir, arch=self.arch)
 
             if f'{repo_id}_src_rpm_dir' in self.sw_vars:
                 src_path = self.sw_vars[f'{repo_id}_src_rpm_dir']
@@ -495,10 +480,8 @@ class software(object):
                 self.sw_vars[f'{repo_id}_src_rpm_dir'] = rpm_path
                 repo_dir = repo.extract_rpm(rpm_path)
                 repo.create_meta()
-                #content = repo.get_yum_dotrepo_content(
-                #    repo_dir=repo_dir, gpgcheck=0, client=True)
-                #filename = repo_id + '-powerup.repo'
-                #self.sw_vars['yum_powerup_repo_files'][filename] = content
+                # content = repo.get_yum_dotrepo_content(
+                #     repo_dir=repo_dir, gpgcheck=0, client=True)
             else:
                 self.log.info('No path chosen. Skipping create custom '
                               'repository.')
@@ -509,7 +492,7 @@ class software(object):
             else:
                 alt_url = None
 
-            repo = PowerupYumRepoFromRepo(repo_id, repo_name, arch=self.arch)
+            repo = PowerupYumRepoFromRepo(repo_id, repo_name, self.root_dir, arch=self.arch)
             repo_dir = repo.get_repo_dir()
             url = repo.get_repo_url(baseurl, alt_url, contains=[repo_id],
                                     filelist=['cuda-10-*-*'])
@@ -523,10 +506,6 @@ class software(object):
                 repo.sync()
                 repo.create_meta()
 
-                # Prep setup of POWER-Up client access to the repo copy
-                #content = repo.get_yum_dotrepo_content(gpgcheck=0, client=True)
-                #filename = repo_id + '-powerup.repo'
-                #self.sw_vars['yum_powerup_repo_files'][filename] = content
                 self.log.info('Repository setup complete')
 
         else:
@@ -547,7 +526,8 @@ class software(object):
         _repo = self.content[name]
         repo_id = _repo.repo_id
         repo_name = _repo.repo_name
-        baseurl = _repo.source.baseurl.format(ana_platform_basename=self.ana_platform_basename)
+        baseurl = _repo.source.baseurl.format(ana_platform_basename=self.
+                                              ana_platform_basename)
         # repo_id = 'ibmai'
         # repo_name = 'IBM AI Repository'
         # baseurl = ('https://public.dhe.ibm.com/ibmdl/export/pub/software/server/'
@@ -565,8 +545,8 @@ class software(object):
             self.log.info(f'The {repo_name} exists already'
                           ' in the POWER-Up server\n')
 
-        repo = PowerupAnaRepoFromRepo(repo_id, repo_name, arch=self.arch)
-
+        repo = PowerupAnaRepoFromRepo(repo_id, repo_name, self.root_dir,
+                                      arch=self.arch)
         ch = repo.get_action(exists)
         if ch in 'Y':
             # if not exists or ch == 'F':
@@ -622,10 +602,12 @@ class software(object):
 
     # Get WMLA Enterprise license file
     def create_wmla_license(self, eval_ver=False, non_int=False):
-        name = 'WMLA license content'
+        name = 'wmla_license'
         heading1(f'Set up {name.title()} \n')
-        lic_src = self.globs[name]
-        exists = self.status_prep(name)
+        item = self.content[name]
+        lic_src = item.fileglob
+        lic_dir = item.path
+        exists = self.status_prep(item.name)
         lic_url = ''
 
         if f'{name}_alt_url' in self.sw_vars:
@@ -638,7 +620,8 @@ class software(object):
                           'server')
 
         if not exists or get_yesno(f'Copy a new {name.title()} file '):
-            src_path, dest_path, state = setup_source_file(name, lic_src, lic_url,
+            src_path, dest_path, state = setup_source_file(name, lic_src, lic_dir,
+                                                           self.root_dir, lic_url,
                                                            alt_url=alt_url)
             if src_path and 'http' in src_path:
                 self.sw_vars[f'{name}_alt_url'] = os.path.dirname(src_path) + '/'
@@ -647,11 +630,14 @@ class software(object):
             self.prep_post()
 
         # Get Spectrum Conductor
-        name = 'Spectrum conductor content'
+    def create_spectrum_conductor(self, eval_ver=False, non_int=False):
+        name = 'spectrum_conductor'
         heading1(f'Set up {name.title()} \n')
-        spc_src = self.globs[name]
-        entitlement = self.globs[name + ' entitlement']
-        exists = self.status_prep(name)
+        item = self.content[name]
+        spc_src = item.fileglob.format(arch=self.arch)
+        spc_dir = item.path
+        entitlement = self.content[item.license_file].fileglob
+        exists = self.status_prep(item.name)
         spc_url = ''
 
         if f'{name}_alt_url' in self.sw_vars:
@@ -664,7 +650,9 @@ class software(object):
                           'POWER-Up server')
 
         if not exists or get_yesno(f'Copy a new {name.title()} file '):
-            src_path, dest_path, state = setup_source_file(name, spc_src, spc_url,
+            src_path, dest_path, state = setup_source_file(name, spc_src, spc_dir,
+                                                           self.root_dir,
+                                                           spc_url,
                                                            alt_url=alt_url,
                                                            src2=entitlement)
             if src_path and 'http' in src_path:
@@ -678,11 +666,15 @@ class software(object):
 
     def create_spectrum_dli(self, eval_ver=False, non_int=False):
         # Get Spectrum DLI
-        name = 'Spectrum DLI content'
+        name = 'spectrum_dli'
         heading1(f'Set up {name.title()} \n')
-        spdli_src = self.globs[name]
-        entitlement = self.globs[name + ' entitlement']
-        exists = self.status_prep(name)
+        # spdli_src = self.globs[name]
+        # entitlement = self.globs[name + ' entitlement']
+        item = self.content[name]
+        spdli_src = item.fileglob.format(arch=self.arch)
+        spdli_dir = item.path
+        entitlement = self.content[item.license_file].fileglob
+        exists = self.status_prep(item.name)
         spdli_url = ''
 
         if f'{name}_alt_url' in self.sw_vars:
@@ -694,7 +686,8 @@ class software(object):
             self.log.info('Spectrum DLI content exists already in the POWER-Up server')
 
         if not exists or get_yesno(f'Copy a new {name.title()} file '):
-            src_path, dest_path, state = setup_source_file(name, spdli_src, spdli_url,
+            src_path, dest_path, state = setup_source_file(name, spdli_src, spdli_dir,
+                                                           self.root_dir, spdli_url,
                                                            alt_url=alt_url,
                                                            src2=entitlement)
             if src_path and 'http' in src_path:
@@ -720,6 +713,7 @@ class software(object):
         _repo = self.content[name]
         repo_id = _repo.repo_id
         repo_name = _repo.repo_name
+        baseurl = ''
 
         heading1(f'Set up {repo_name} repository')
 
@@ -794,7 +788,8 @@ class software(object):
                                          'Repository source? ')
 
             if ch == 'E':
-                repo = PowerupRepo(repo_id, repo_name, proc_family=self.proc_family)
+                repo = PowerupRepo(repo_id, repo_name, self.root_dir,
+                                   proc_family=self.proc_family)
                 repo_dir = repo.get_repo_dir()
                 os.makedirs(repo_dir, exist_ok=True)
                 self._add_dependent_packages(repo_dir, dep_list, also_get_newer=True)
@@ -802,12 +797,10 @@ class software(object):
                 repo.create_meta()
                 # content = repo.get_yum_dotrepo_content(gpgcheck=0, local=True)
                 # repo.write_yum_dot_repo_file(content)
-                #content = repo.get_yum_dotrepo_content(gpgcheck=0, client=True)
-                #filename = repo_id + '-powerup.repo'
-                #self.sw_vars['yum_powerup_repo_files'][filename] = content
 
             elif ch == 'D':
-                repo = PowerupRepoFromDir(repo_id, repo_name, arch=self.arch, proc_family=self.proc_family)
+                repo = PowerupRepoFromDir(repo_id, repo_name, self.root_dir,
+                                          arch=self.arch, proc_family=self.proc_family)
 
                 if f'{repo_id}_src_dir' in self.sw_vars:
                     src_dir = self.sw_vars[f'{repo_id}_src_dir']
@@ -819,9 +812,6 @@ class software(object):
                     repo.create_meta()
                     # content = repo.get_yum_dotrepo_content(gpgcheck=0, local=True)
                     # repo.write_yum_dot_repo_file(content)
-                    #content = repo.get_yum_dotrepo_content(gpgcheck=0, client=True)
-                    #filename = repo_id + '-powerup.repo'
-                    #self.sw_vars['yum_powerup_repo_files'][filename] = content
 
             elif ch == 'R':
                 if f'{repo_id}_alt_url' in self.sw_vars:
@@ -829,7 +819,8 @@ class software(object):
                 else:
                     alt_url = None
 
-                repo = PowerupYumRepoFromRepo(repo_id, repo_name, arch=self.arch,
+                repo = PowerupYumRepoFromRepo(repo_id, repo_name, self.root_dir,
+                                              arch=self.arch,
                                               proc_family=self.proc_family)
 
                 url = repo.get_repo_url(baseurl, alt_url, contains=[repo_id],
@@ -849,9 +840,6 @@ class software(object):
                     #    content = repo.get_yum_dotrepo_content(gpgcheck=0, local=True)
                     #    repo.write_yum_dot_repo_file(content)
                     # Prep setup of POWER-Up client access to the repo copy
-                    #content = repo.get_yum_dotrepo_content(gpgcheck=0, client=True)
-                    #filename = repo_id + '-powerup.repo'
-                    #self.sw_vars['yum_powerup_repo_files'][filename] = content
                     self.log.info('Repository setup complete')
             else:
                 print(f'{repo_name} repository not updated')
@@ -861,15 +849,15 @@ class software(object):
 
     def create_conda_content_repo(self, eval_ver=False, non_int=False):
         # Get Anaconda
-        ana_name = 'Anaconda content'
-        ana_src = self.globs[ana_name]
-        ana_url = 'https://repo.continuum.io/archive/'
+        ana_name = 'anaconda'
+        item = self.content[ana_name]
+        ana_src = item.fileglob.format(arch=self.arch)
+        ana_url = item.source.url
         if f'{ana_name}_alt_url' in self.sw_vars:
             alt_url = self.sw_vars[f'{ana_name}_alt_url']
         else:
             alt_url = 'http://'
-
-        exists = self.status_prep(which=ana_name)
+        exists = self.status_prep(which=item.name)
 
         heading1('Set up Anaconda\n')
 
@@ -879,7 +867,8 @@ class software(object):
 
         if not exists or get_yesno(f'Recopy {ana_name} '):
 
-            src_path, dest_path, state = setup_source_file(ana_name, ana_src, ana_url,
+            src_path, dest_path, state = setup_source_file(ana_name, ana_src,
+                                                           self.root_dir, ana_url,
                                                            alt_url=alt_url)
             if dest_path:
                 self.sw_vars['content_files'][get_name_dir(ana_name)] = dest_path
@@ -889,16 +878,12 @@ class software(object):
 
     def create_conda_free_repo(self, eval_ver=False, non_int=False):
         # Setup Anaconda Free Repo.  (not a YUM repo)
-#        repo_id = 'anaconda'
-#        repo_name = 'Anaconda Free Repository'
-#        platform_basename = '64' if self.arch == "x86_64" else self.arch
-#        baseurl = f'https://repo.continuum.io/pkgs/free/linux-{platform_basename}/'
-
         name = 'anaconda_free'
         _repo = self.content[name]
         repo_id = _repo.repo_id
         repo_name = _repo.repo_name
-        baseurl = _repo.source.baseurl.format(ana_platform_basename=self.ana_platform_basename)
+        baseurl = _repo.source.baseurl.format(ana_platform_basename=self.
+                                              ana_platform_basename)
         heading1(f'Set up {repo_name}\n')
 
         vars_key = get_name_dir(repo_name)  # format the name
@@ -912,8 +897,8 @@ class software(object):
             self.log.info('The Anaconda Repository exists already'
                           ' in the POWER-Up server\n')
 
-        repo = PowerupAnaRepoFromRepo(repo_id, repo_name, arch=self.arch)
-
+        repo = PowerupAnaRepoFromRepo(repo_id, repo_name, self.root_dir,
+                                      arch=self.arch)
         ch = repo.get_action(exists)
         if ch in 'Y':
             # if not exists or ch == 'F':
@@ -945,16 +930,12 @@ class software(object):
 
     def create_conda_main_repo(self, eval_ver=False, non_int=False):
         # Setup Anaconda Main Repo.  (not a YUM repo)
-#        repo_id = 'anaconda'
-#        repo_name = 'Anaconda Main Repository'
-#        platform_basename = '64' if self.arch == "x86_64" else self.arch
-#        baseurl = f'https://repo.continuum.io/pkgs/main/linux-{platform_basename}/'
-
         name = 'anaconda_main'
         _repo = self.content[name]
         repo_id = _repo.repo_id
         repo_name = _repo.repo_name
-        baseurl = _repo.source.baseurl.format(ana_platform_basename=self.ana_platform_basename)
+        baseurl = _repo.source.baseurl.format(ana_platform_basename=self.
+                                              ana_platform_basename)
 
         heading1(f'Set up {repo_name}\n')
 
@@ -969,7 +950,7 @@ class software(object):
             self.log.info('The Anaconda Repository exists already'
                           ' in the POWER-Up server\n')
 
-        repo = PowerupAnaRepoFromRepo(repo_id, repo_name, arch=self.arch)
+        repo = PowerupAnaRepoFromRepo(repo_id, repo_name, self.root_dir, arch=self.arch)
 
         ch = repo.get_action(exists)
         if ch in 'Y':
@@ -984,7 +965,6 @@ class software(object):
                 rl = self.pkgs[f'anaconda_main_linux_{self.arch}']['reject_list']
 
                 dest_dir = repo.sync_ana(url, acclist=al, rejlist=rl)
-                # dest_dir = repo.sync_ana(url)
                 dest_dir = dest_dir[4 + dest_dir.find('/srv'):5 + dest_dir.find('main')]
                 # form .condarc channel entry. Note that conda adds
                 # the corresponding 'noarch' channel automatically.
@@ -1000,21 +980,24 @@ class software(object):
 
     def create_pypi_repo(self, eval_ver=False, non_int=False):
         # Setup Python package repository. (pypi)
-        repo_id = 'pypi'
-        repo_name = 'Python Package'
-        baseurl = 'https://pypi.org'
+        _repo = self.content['pypi']
+        repo_id = _repo.repo_id
+        repo_name = _repo.repo_name
+        baseurl = _repo.source.baseurl
+
         heading1(f'Set up {repo_name} repository\n')
         if f'{repo_id}_alt_url' in self.sw_vars:
             alt_url = self.sw_vars[f'{repo_id}_alt_url']
         else:
             alt_url = None
 
-        exists = self.status_prep(which='Python Package Repository')
+        exists = self.status_prep(which=_repo.desc)
         if exists:
             self.log.info('The Python Package Repository exists already'
                           ' in the POWER-Up server')
 
-        repo = PowerupPypiRepoFromRepo(repo_id, repo_name, arch=self.arch)
+        repo = PowerupPypiRepoFromRepo(repo_id, repo_name, self.root_dir,
+                                       arch=self.arch)
         ch = repo.get_action(exists, exists_prompt_yn=True)
 
         pkg_list = ' '.join(self.pkgs['python_pkgs'])
@@ -1034,15 +1017,11 @@ class software(object):
 
     def create_epel_repo(self, eval_ver=False, non_int=False):
         # Setup EPEL Repo
-        # repo_id = f'epel-{self.arch}'
-        # repo_name = f'EPEL {self.arch} subset'
-        # baseurl = ''
-
         name = 'epel'
         _repo = self.content[name]
         repo_id = _repo.repo_id.format(arch=self.arch)
         repo_name = _repo.repo_name.format(arch=self.arch)
-        set_trace()
+        baseurl = ''
         heading1(f'Set up {repo_name} repository')
         epel_list = ' '.join(self.pkgs['epel_pkgs'])
 
@@ -1086,19 +1065,16 @@ class software(object):
                                      'Repository source? ')
 
             if ch == 'E':
-                repo = PowerupRepo(repo_id, repo_name)
+                repo = PowerupRepo(repo_id, repo_name, self.root_dir)
                 repo_dir = repo.get_repo_dir()
                 self._add_dependent_packages(repo_dir, epel_list, also_get_newer=True)
                 self._add_dependent_packages(repo_dir, more, also_get_newer=True)
                 repo.create_meta()
                 # content = repo.get_yum_dotrepo_content(gpgcheck=0, local=True)
                 # repo.write_yum_dot_repo_file(content)
-                #content = repo.get_yum_dotrepo_content(gpgcheck=0, client=True)
-                #filename = repo_id + '-powerup.repo'
-                #self.sw_vars['yum_powerup_repo_files'][filename] = content
 
             elif ch == 'D':
-                repo = PowerupRepoFromDir(repo_id, repo_name)
+                repo = PowerupRepoFromDir(repo_id, repo_name, self.root_dir)
 
                 if f'{repo_id}_src_dir' in self.sw_vars:
                     src_dir = self.sw_vars[f'{repo_id}_src_dir']
@@ -1110,9 +1086,6 @@ class software(object):
                     repo.create_meta()
                     # content = repo.get_yum_dotrepo_content(gpgcheck=0, local=True)
                     # repo.write_yum_dot_repo_file(content)
-                    #content = repo.get_yum_dotrepo_content(gpgcheck=0, client=True)
-                    #filename = repo_id + '-powerup.repo'
-                    #self.sw_vars['yum_powerup_repo_files'][filename] = content
 
             elif ch == 'R':
                 if f'{repo_id}_alt_url' in self.sw_vars:
@@ -1120,8 +1093,8 @@ class software(object):
                 else:
                     alt_url = None
 
-                repo = PowerupYumRepoFromRepo(repo_id, repo_name, arch=self.arch)
-
+                repo = PowerupYumRepoFromRepo(repo_id, repo_name, self.root_dir,
+                                              arch=self.arch)
                 url = repo.get_repo_url(baseurl, alt_url, contains=[repo_id],
                                         filelist=['openblas-*'])
                 if url:
@@ -1139,9 +1112,6 @@ class software(object):
                     #    content = repo.get_yum_dotrepo_content(gpgcheck=0, local=True)
                     #    repo.write_yum_dot_repo_file(content)
                     # Prep setup of POWER-Up client access to the repo copy
-                    #content = repo.get_yum_dotrepo_content(gpgcheck=0, client=True)
-                    #filename = repo_id + '-powerup.repo'
-                    #self.sw_vars['yum_powerup_repo_files'][filename] = content
                     self.log.info('Repository setup complete')
             else:
                 print(f'{repo_name} repository not updated')
@@ -1165,11 +1135,12 @@ class software(object):
                                           'Repository source? ', allow_none=True)
                     if ch != 'N':
                         if ch == 'rpm':
-                            # prompts user for the location of the rpm file to be loaded into
-                            # the PowerUp server.  The file is copied to {self.root_dir}{repo_id}. The
-                            # contents of the rpm file are then extracted under {self.root_dir}repos/
-                            # Meta data is created. yum.repo content is generated and added to
-                            # the software-vars.yml file
+                            # prompts user for the location of the rpm file to be loaded
+                            # into the PowerUp server. The file is copied to
+                            # {self.root_dir}{repo_id}. The contents of the rpm file
+                            # are then extracted under {self.root_dir}repos/
+                            # Meta data is created. yum.repo content is generated and
+                            # added to the software-vars.yml file
                             repo = PowerupRepoFromRpm(repo_id, repo_name, arch=self.arch)
 
                             if f'{repo_id}_src_rpm_dir' in self.sw_vars:
@@ -1211,9 +1182,6 @@ class software(object):
                             if src_dir:
                                 self.sw_vars[f'{repo_id}_src_dir'] = src_dir
                                 repo.create_meta()
-                                #content = repo.get_yum_dotrepo_content(gpgcheck=0,
-                                #                                       local=True)
-                                #repo.write_yum_dot_repo_file(content)
                                 content = repo.get_yum_dotrepo_content(gpgcheck=0,
                                                                        client=True)
                                 filename = repo_id + '-powerup.repo'
@@ -1286,6 +1254,8 @@ class software(object):
         self.create_ibmai_repo()
 
         self.create_wmla_license()
+
+        self.create_spectrum_conductor()
 
         self.create_spectrum_dli()
 
@@ -1578,8 +1548,6 @@ class software(object):
                                 '**', 'repodata')
         paths = glob.glob(_dirglob, recursive=True)
         paths = [path.rstrip('repodata') for path in paths]
-        #if self.proc_family:
-        #    paths = [path for path in paths if self.proc_family in path]
         return paths
 
     def _get_conda_repo_dirs(self, repo_id, repo_name):
@@ -1605,8 +1573,6 @@ class software(object):
             self.proc_family = 'x86_64'
 
     def _update_software_vars(self):
-        #from pdb import set_trace
-        #set_trace()
         self.sw_vars['content_files'] = {}
         self.sw_vars['ana_powerup_repo_channels'] = []
         self.sw_vars['yum_powerup_repo_files'] = {}
@@ -1631,7 +1597,6 @@ class software(object):
                     self.log.error(f'No {_glob} found in software server.')
                     path = ''
                 self.sw_vars['content_files'][_item.replace('_', '-')] = path
-                # set_trace()
             elif item.type == 'conda':
                 repo_id = item.repo_id
                 repo_name = item.repo_name
@@ -1658,12 +1623,10 @@ class software(object):
                     self.sw_vars['ana_powerup_repo_channels'].append(channel)
 
             elif item.type == 'yum':
-                #set_trace()
                 repo_id = item.repo_id.format(arch=self.arch)
                 repo_name = item.repo_name.format(arch=self.arch)
                 dirs = self._get_yum_repo_dirs(repo_id)
                 if self.proc_family and repo_name == 'Dependencies':
-                    #proc_fam = f'/{self.proc_family}/'
                     dirs = [d for d in dirs if self.proc_family in d]
 
                 if len(dirs) == 1:
@@ -1693,7 +1656,6 @@ class software(object):
                     self.sw_vars['yum_powerup_repo_files'][filename] = dotrepo_content
                 else:
                     self.sw_vars['yum_powerup_repo_files'][filename] = ''
-        #set_trace()
 
     def _install_ready(self):
         ready = True
@@ -1702,13 +1664,10 @@ class software(object):
         ready = ready and all([item != '' for item in self.sw_vars['ana_powerup_repo_channels']])
         return ready
 
-
     def install(self):
         print()
 
         self._update_software_vars()
-        #from pdb import set_trace
-        #set_trace()
         if not self._install_ready():
             msg = ('\nNot all content is present in the software server. Re-run\n'
                    'the prep phase of installation to update needed content\n'
