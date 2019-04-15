@@ -408,6 +408,13 @@ def get_args(parser_args=False):
         help='Runs the software phase with specified architecture')
 
     parser_software.add_argument(
+        '--base-dir',
+        default=None,
+        # choices=['ppc64le', 'x86_64'],
+        help='Set the base directory for storing server content. This directory '
+             'will reside under the web server root directory.')
+
+    parser_software.add_argument(
         '--step',
         default=None,
         nargs='+',

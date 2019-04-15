@@ -34,7 +34,7 @@ from getpass import getpass
 import pwd
 import grp
 import click
-
+from pdb import set_trace
 import lib.logger as logger
 from repos import PowerupRepo, PowerupRepoFromDir, PowerupYumRepoFromRepo, \
     PowerupAnaRepoFromRepo, PowerupRepoFromRpm, setup_source_file, \
@@ -60,14 +60,12 @@ class software(object):
     installation.
     """
     def __init__(self, eval_ver=False, non_int=False, arch='ppc64le',
-                 proc_family=None, engr_mode=False):
+                 proc_family=None, engr_mode=False, base_dir=None):
         self.log = logger.getlogger()
         self.log_lvl = logger.get_log_level_print()
         self.my_name = sys.modules[__name__].__name__
         self.rhel_ver = '7'
         self.arch = arch
-        self.root_dir_nginx = '/srv'
-        self.root_dir = f'{self.root_dir_nginx}/{self.my_name}-{arch}/'
         self.yum_powerup_repo_files = []
         self.eval_ver = eval_ver
         self.non_int = non_int
@@ -86,17 +84,16 @@ class software(object):
         self._load_filelist()
         self.eng_mode = engr_mode
         yaml.add_constructor(YAMLVault.yaml_tag, YAMLVault.from_yaml)
-        self.arch = arch
         self.ana_platform_basename = '64' if self.arch == "x86_64" else self.arch
 
         self.sw_vars_file_name = 'software-vars.yml'
         self.log.info(f"Using architecture: {self.arch}")
 
         # Only yum repos should be listed under self.repo_id
-        self.repo_id = {'EPEL Repository': f'epel-{self.arch}',
-                        'Dependent Packages Repository': 'dependencies',
-                        'Python Package Repository': 'pypi',
-                        'CUDA Driver Repository': 'cuda'}
+#        self.repo_id = {'EPEL Repository': f'epel-{self.arch}',
+#                        'Dependent Packages Repository': 'dependencies',
+#                        'Python Package Repository': 'pypi',
+#                        'CUDA Driver Repository': 'cuda'}
 
         self._load_content()
         self._load_pkglist()
@@ -127,6 +124,22 @@ class software(object):
             self.sw_vars = {}
             self.sw_vars['init-time'] = time.ctime()
 
+        self.root_dir_nginx = '/srv'
+        if base_dir is not None:
+            base_dir = base_dir.replace('/', '')
+            if base_dir:
+                self.root_dir = f'{self.root_dir_nginx}/{base_dir}/'
+                self.sw_vars['base_dir'] = base_dir
+            else:
+                if 'base_dir' in self.sw_vars:
+                    del self.sw_vars['base_dir']
+                self.root_dir = f'{self.root_dir_nginx}/{self.my_name}-{arch}/'
+        elif 'base_dir' in self.sw_vars:
+            self.root_dir = f"{self.root_dir_nginx}/{self.sw_vars['base_dir']}/"
+        else:
+            self.root_dir = f'{self.root_dir_nginx}/{self.my_name}-{arch}/'
+        set_trace()
+
         if ('ana_powerup_repo_channels' not in self.sw_vars or not
                 isinstance(self.sw_vars['ana_powerup_repo_channels'], list)):
             self.sw_vars['ana_powerup_repo_channels'] = []
@@ -137,8 +150,8 @@ class software(object):
                 isinstance(self.sw_vars['content_files'], dict)):
             self.sw_vars['content_files'] = {}
 
-        self.epel_repo_name = self.repo_id['EPEL Repository']
-        self.sw_vars['epel_repo_name'] = self.epel_repo_name
+#        self.epel_repo_name = self.repo_id['EPEL Repository']
+#        self.sw_vars['epel_repo_name'] = self.epel_repo_name
         self.sw_vars['rhel_ver'] = self.rhel_ver
         self.sw_vars['arch'] = self.arch
 
