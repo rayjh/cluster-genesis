@@ -34,7 +34,6 @@ from getpass import getpass
 import pwd
 import grp
 import click
-from pdb import set_trace
 import lib.logger as logger
 from repos import PowerupRepo, PowerupRepoFromDir, PowerupYumRepoFromRepo, \
     PowerupAnaRepoFromRepo, PowerupRepoFromRpm, setup_source_file, \
@@ -138,7 +137,6 @@ class software(object):
             self.root_dir = f"{self.root_dir_nginx}/{self.sw_vars['base_dir']}/"
         else:
             self.root_dir = f'{self.root_dir_nginx}/{self.my_name}-{arch}/'
-        set_trace()
 
         if ('ana_powerup_repo_channels' not in self.sw_vars or not
                 isinstance(self.sw_vars['ana_powerup_repo_channels'], list)):
@@ -1406,6 +1404,7 @@ class software(object):
     def init_clients(self):
         log = logger.getlogger()
 
+        self._update_software_vars()
         self.sw_vars['ansible_inventory'] = get_ansible_inventory()
 
         sudo_password = None
