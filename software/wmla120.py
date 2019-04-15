@@ -88,12 +88,6 @@ class software(object):
         self.sw_vars_file_name = 'software-vars.yml'
         self.log.info(f"Using architecture: {self.arch}")
 
-        # Only yum repos should be listed under self.repo_id
-#        self.repo_id = {'EPEL Repository': f'epel-{self.arch}',
-#                        'Dependent Packages Repository': 'dependencies',
-#                        'Python Package Repository': 'pypi',
-#                        'CUDA Driver Repository': 'cuda'}
-
         self._load_content()
         self._load_pkglist()
 
@@ -138,6 +132,9 @@ class software(object):
         else:
             self.root_dir = f'{self.root_dir_nginx}/{self.my_name}-{arch}/'
 
+        # Primarily intended for display purposes:
+        self.repo_shortname = self.root_dir[len(self.root_dir_nginx):].strip('/')
+
         if ('ana_powerup_repo_channels' not in self.sw_vars or not
                 isinstance(self.sw_vars['ana_powerup_repo_channels'], list)):
             self.sw_vars['ana_powerup_repo_channels'] = []
@@ -148,10 +145,20 @@ class software(object):
                 isinstance(self.sw_vars['content_files'], dict)):
             self.sw_vars['content_files'] = {}
 
-#        self.epel_repo_name = self.repo_id['EPEL Repository']
-#        self.sw_vars['epel_repo_name'] = self.epel_repo_name
         self.sw_vars['rhel_ver'] = self.rhel_ver
         self.sw_vars['arch'] = self.arch
+
+        if os.path.isdir('/srv/wmla-license') and not os.path.isdir(self.root_dir):
+            msg = ('This version of the PowerUp software server utilizes a new '
+                   'directory layout.\n'
+                   f'No software server content exists under {self.root_dir}\n'
+                   'PowerUp can copy or move your existing repositories.')
+            print(msg)
+            if get_yesno('Would you like to copy or move your existing '
+                         'repositories? '):
+
+                import create_base_dir_wmla120
+                create_base_dir_wmla120.create_base_dir()
 
         if 'ansible_inventory' not in self.sw_vars:
             self.sw_vars['ansible_inventory'] = None
@@ -343,7 +350,7 @@ class software(object):
 
         exists = True
         if which == 'all':
-            heading1('Preparation Summary')
+            heading1(f'Preparation Summary for {self.repo_shortname}')
             for item in self.state:
                 status = self.state[item]
                 it = (item + '                              ')[:38]
@@ -1404,6 +1411,9 @@ class software(object):
     def init_clients(self):
         log = logger.getlogger()
 
+        print(bold(f'\nInitializing clients for install from  Repository : '
+              f'{self.repo_shortname}\n'))
+        self.sw_vars['init_clients'] = self.repo_shortname
         self._update_software_vars()
         self.sw_vars['ansible_inventory'] = get_ansible_inventory()
 
@@ -1454,6 +1464,10 @@ class software(object):
                     log.debug('User chooses to exit.')
                     sys.exit('Exiting')
             else:
+                self.sw_vars['proc_family'] = self.proc_family
+                self.sw_vars['arch'] = self.arch
+                self.sw_vars['eval_ver'] = self.eval_ver
+                self.prep_post()
                 log.info("Ansible playbook ran successfully")
                 run = False
             print('All done')
@@ -1671,14 +1685,50 @@ class software(object):
 
     def _install_ready(self):
         ready = True
-        ready = ready and all([item != '' for item in self.sw_vars['content_files'].values()])
-        ready = ready and all([item != '' for item in self.sw_vars['yum_powerup_repo_files'].values()])
-        ready = ready and all([item != '' for item in self.sw_vars['ana_powerup_repo_channels']])
+        ready = ready and all([item != '' for item in
+                              self.sw_vars['content_files'].values()])
+        ready = ready and all([item != '' for item in
+                              self.sw_vars['yum_powerup_repo_files'].values()])
+        ready = ready and all([item != '' for item in
+                              self.sw_vars['ana_powerup_repo_channels']])
+        return ready
+
+    def _init_clients_check(self):
+        ready = True
+        if not 'init_clients' in self.sw_vars:
+            self.log.error('Initialization of clients has not been run. Please run\n'
+                           'pup software --init-clients \n'
+                           'before running install.')
+            ready = False
+        if self.repo_shortname != self.sw_vars['init_clients']:
+            self.log.warning('The cluster nodes were last configured for installation\n'
+                             'from self.sw_vars["init_clients"], but you are requesting\n'
+                             'installation from {self.repo_shortname}')
+            if not get_yesno('Okay to continue? '):
+                ready = False
+
+        if self.sw_vars['proc_family'] != self.proc_family:
+            sys.exit('The cluster nodes were last configured for installation as '
+                     f'{self.sw_vars["proc_family"]}\n, but you are running install '
+                     f'with processor family set to {self.proc_family}.  Exiting.')
+            ready = False
+
+        if self.sw_vars['arch'] != self.arch:
+            sys.exit('The cluster nodes were last configured for installation as '
+                     f'{self.sw_vars["arch"]}\n, but you are running install '
+                     f'with architecture set to {self.arch}.  Exiting.')
+            ready = False
+
+        if self.sw_vars['eval_ver'] != self.eval_ver:
+            sys.exit('The cluster nodes were last configured for installation with '
+                     f'evaluation version set to{self.sw_vars["eval_ver"]}\n'
+                     f'but you are running the current install '
+                     f'with evaluation version set to {self.eval_ver}.  Exiting.')
+            ready = False
+
         return ready
 
     def install(self):
-        print()
-
         self._update_software_vars()
         if not self._install_ready():
             msg = ('\nNot all content is present in the software server. Re-run\n'
@@ -1688,6 +1738,11 @@ class software(object):
                    'missing content.\nRun: pup software -h for additional '
                    'help\nExiting\n')
             sys.exit(msg)
+
+        if not self._init_clients_check():
+            sys.exit('Exiting')
+
+        print(bold(f'\n     Installing from Repository : {self.repo_shortname}\n'))
 
         if self.sw_vars['ansible_inventory'] is None:
             self.sw_vars['ansible_inventory'] = get_ansible_inventory()
