@@ -206,6 +206,18 @@ class software(object):
                 'Note: The \'pup\' cli supports tab autocompletion.\n\n')
         print(text)
 
+    def _is_nginx_running(self):
+        cmd = 'nginx -v'
+        ret = False
+        try:
+            resp, err, rc = sub_proc_exec(cmd)
+            if 'nginx version:' in err:
+                ret = True
+        except FileNotFoundError:
+            pass
+
+        return ret
+
     def status(self, which='all'):
         self._update_software_vars()
         self.status_prep(which)
@@ -300,6 +312,23 @@ class software(object):
                 if os.path.exists(f'{self.root_dir}repos/{item.repo_id}/simple/') and \
                         len(os.listdir(f'{self.root_dir}repos/{item.repo_id}/simple/')) >= 1:
                     self.state[item.desc] = 'Setup'
+
+            # Nginx web server status
+            if item == 'Nginx Web Server' and self._is_nginx_running():
+                temp_dir = 'nginx-test-dir-123'
+                abs_temp_dir = os.path.join(self.root_dir, temp_dir)
+                test_file = 'test-file.abc'
+                test_path = os.path.join(abs_temp_dir, test_file)
+                try:
+                    rmtree(abs_temp_dir, ignore_errors=True)
+                    os.mkdir(abs_temp_dir)
+                    # os.mknod(test_file)
+                    with open(test_path, 'x') as f:
+                        pass
+                except:
+                    self.log.error('Failed trying to create temporary file '
+                                   f'{test_path}. Check access privileges')
+                    sys.exit('Exiting. Unable to continue.')
                 else:
                     self.state[item.desc] = '-'
                 continue
@@ -411,9 +440,14 @@ class software(object):
     def _setup_nginx_server(self, eval_ver=False, non_int=False):
         # nginx setup
         heading1('Set up Nginx')
+
+        if not self._is_nginx_running():
+            nginx_setup(root_dir=self.root_dir_nginx, repo_id='nginx')
+
         exists = self.status_prep(which='Nginx Web Server')
         if not exists:
-            nginx_setup(root_dir=self.root_dir_nginx, repo_id='nginx')
+            self.log.error('Nginx is unable to access content.')
+            sys.exit()
 
         self.status_prep(which='Nginx Web Server')
         if self.state['Nginx Web Server'] == '-':
