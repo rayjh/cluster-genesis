@@ -34,6 +34,7 @@ from getpass import getpass
 import pwd
 import grp
 import click
+
 import lib.logger as logger
 from repos import PowerupRepo, PowerupRepoFromDir, PowerupYumRepoFromRepo, \
     PowerupAnaRepoFromRepo, PowerupRepoFromRpm, setup_source_file, \
@@ -240,7 +241,7 @@ class software(object):
         def content_status(item):
             ver_mis = False
             item_dir = item.path
-            if self.eval_ver:
+            if self.eval_ver and hasattr(item, 'fileglob_eval'):
                 fileglob = item.fileglob_eval.format(arch=self.arch)
             else:
                 fileglob = item.fileglob.format(arch=self.arch)
@@ -1375,7 +1376,8 @@ class software(object):
 
     def _load_pkglist(self):
         try:
-            self.pkgs = yaml.load(open(GEN_SOFTWARE_PATH + f'pkg-lists-{self.base_filename}.yml'))
+            self.pkgs = yaml.load(open(GEN_SOFTWARE_PATH + f'pkg-lists-'
+                                  f'{self.base_filename}.yml'))
         except IOError:
             self.log.error(f'Error opening the pkg lists file '
                            f'(pkg-lists-{self.base_filename}.yml)')
@@ -1387,9 +1389,11 @@ class software(object):
         # regular extression of [0-9]{0,3} Other asterisks are converted to regular
         # expression of .*
         try:
-            file_lists = yaml.load(open(GEN_SOFTWARE_PATH + f'file-lists-{self.base_filename}.yml'))
+            file_lists = yaml.load(open(GEN_SOFTWARE_PATH + f'file-lists-'
+                                   f'{self.base_filename}.yml'))
         except IOError:
-            self.log.info('Error while reading installation file lists for WMLA Enterprise')
+            self.log.info('Error while reading installation file lists for '
+                          'WMLA Enterprise')
             sys.exit('exiting')
             input('\nPress enter to continue')
         else:
@@ -1639,7 +1643,10 @@ class software(object):
         for _item in self.content:
             item = self.content[_item]
             if item.type == 'file':
-                _glob = item.fileglob_eval if self.eval_ver else item.fileglob
+                if self.eval_ver and hasattr(item, 'fileglob_eval'):
+                    _glob = item.fileglob_eval
+                else:
+                    _glob = item.fileglob
                 _glob = _glob.format(arch=self.arch)
                 paths = self._get_file_paths(_glob)
 
@@ -1729,7 +1736,7 @@ class software(object):
 
     def _init_clients_check(self):
         ready = True
-        if not 'init_clients' in self.sw_vars:
+        if 'init_clients' not in self.sw_vars:
             self.log.error('Initialization of clients has not been run. Please run\n'
                            'pup software --init-clients \n'
                            'before running install.')
@@ -1742,22 +1749,25 @@ class software(object):
                 ready = False
 
         if self.sw_vars['proc_family'] != self.proc_family:
-            sys.exit('The cluster nodes were last configured for installation as '
+            sys.exit('\nThe cluster nodes were last configured for installation as '
                      f'{self.sw_vars["proc_family"]}\n, but you are running install '
-                     f'with processor family set to {self.proc_family}.  Exiting.')
+                     f'with processor family set to {self.proc_family}.\nPlease rerun '
+                     ' init-clients. Exiting.')
             ready = False
 
         if self.sw_vars['arch'] != self.arch:
-            sys.exit('The cluster nodes were last configured for installation as '
+            sys.exit('\nThe cluster nodes were last configured for installation as '
                      f'{self.sw_vars["arch"]}\n, but you are running install '
-                     f'with architecture set to {self.arch}.  Exiting.')
+                     f'with architecture set to {self.arch}.\nPlease rerun '
+                     '--init-clients. Exiting.')
             ready = False
 
         if self.sw_vars['eval_ver'] != self.eval_ver:
-            sys.exit('The cluster nodes were last configured for installation with '
+            sys.exit('\nThe cluster nodes were last configured for installation with '
                      f'evaluation version set to{self.sw_vars["eval_ver"]}\n'
                      f'but you are running the current install '
-                     f'with evaluation version set to {self.eval_ver}.  Exiting.')
+                     f'with evaluation version set to {self.eval_ver}.\n Please rerun '
+                     '--init-clients. Exiting.')
             ready = False
 
         return ready
