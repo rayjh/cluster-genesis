@@ -42,12 +42,15 @@ def nginx_setup(root_dir='/srv', repo_id='nginx'):
     repo_file = os.path.join('/etc/yum.repos.d', repo_id + '.repo')
 
     if os.path.isfile(repo_file):
-        line_in_file(repo_file, r'^baseurl=.+', f'baseurl={baseurl}')
-        for cmd in ['yum clean all', 'yum makecache']:
-            resp, err, rc = sub_proc_exec(cmd)
-            if rc != 0:
-                log.error(f"A problem occured while running '{cmd}'")
-                log.error(f'Response: {resp}\nError: {err}\nRC: {rc}')
+        with open(repo_file, 'r') as f:
+            content = f.read()
+        if not baseurl in content:
+            line_in_file(repo_file, r'^baseurl=.+', f'baseurl={baseurl}')
+            for cmd in ['yum clean all', 'yum makecache']:
+                resp, err, rc = sub_proc_exec(cmd)
+                if rc != 0:
+                    log.error(f"A problem occured while running '{cmd}'")
+                    log.error(f'Response: {resp}\nError: {err}\nRC: {rc}')
     else:
         repo_name = 'nginx.org public'
         repo = PowerupRepo(repo_id, repo_name, root_dir)

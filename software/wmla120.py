@@ -173,37 +173,6 @@ class software(object):
                 import create_base_dir_wmla120
                 create_base_dir_wmla120.create_base_dir(self.root_dir_nginx)
 
-        self.sw_vars['eval_ver'] = self.eval_ver
-        self.root_dir = '/srv/'
-        self._load_filelist()
-        # If empty, initialize software_vars content and repo info
-        # from software server directory
-        update = False
-        for item in self.state:
-            if 'content' in item:
-                item_key = get_name_dir(item)
-                item_dir = item_key
-                if item_dir.endswith('-entitlement'):
-                    item_dir = item_dir[:-12]
-                exists = glob.glob(f'/srv/{item_dir}/**/{self.files[item]}',
-                                   recursive=True)
-                if not exists:
-                    exists = glob.glob(f'/srv/{item_dir}/**/{self.globs[item]}',
-                                       recursive=True)
-                    if exists:
-                        self.sw_vars['content_files'][item_key] = exists[0]
-
-                if item_key not in self.sw_vars['content_files']:
-                    update = True
-                    if exists:
-                        self.sw_vars['content_files'][item_key] = exists[0]
-                    else:
-                        self.sw_vars['content_files'][item_key] = ''
-        if update:
-            self.log.info('Content installation pointers were updated.\n'
-                          'To insure content levels are correct, run \n'
-                          'pup software --prep <module name>\n')
-
         if 'ansible_inventory' not in self.sw_vars:
             self.sw_vars['ansible_inventory'] = None
         if 'ansible_become_pass' not in self.sw_vars:
@@ -264,6 +233,7 @@ class software(object):
 
     def status(self, which='all'):
         self._update_software_vars()
+        self.prep_init()
         self.status_prep(which)
         self.prep_post()
 
@@ -486,8 +456,8 @@ class software(object):
         # nginx setup
         heading1('Set up Nginx')
 
-        if not self._is_nginx_running():
-            nginx_setup(root_dir=self.root_dir_nginx, repo_id='nginx')
+        #if not self._is_nginx_running():
+        nginx_setup(root_dir=self.root_dir_nginx, repo_id='nginx')
 
         exists = self.status_prep(which='Nginx Web Server')
         if not exists:
