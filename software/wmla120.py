@@ -173,6 +173,37 @@ class software(object):
                 import create_base_dir_wmla120
                 create_base_dir_wmla120.create_base_dir(self.root_dir_nginx)
 
+        self.sw_vars['eval_ver'] = self.eval_ver
+        self.root_dir = '/srv/'
+        self._load_filelist()
+        # If empty, initialize software_vars content and repo info
+        # from software server directory
+        update = False
+        for item in self.state:
+            if 'content' in item:
+                item_key = get_name_dir(item)
+                item_dir = item_key
+                if item_dir.endswith('-entitlement'):
+                    item_dir = item_dir[:-12]
+                exists = glob.glob(f'/srv/{item_dir}/**/{self.files[item]}',
+                                   recursive=True)
+                if not exists:
+                    exists = glob.glob(f'/srv/{item_dir}/**/{self.globs[item]}',
+                                       recursive=True)
+                    if exists:
+                        self.sw_vars['content_files'][item_key] = exists[0]
+
+                if item_key not in self.sw_vars['content_files']:
+                    update = True
+                    if exists:
+                        self.sw_vars['content_files'][item_key] = exists[0]
+                    else:
+                        self.sw_vars['content_files'][item_key] = ''
+        if update:
+            self.log.info('Content installation pointers were updated.\n'
+                          'To insure content levels are correct, run \n'
+                          'pup software --prep <module name>\n')
+
         if 'ansible_inventory' not in self.sw_vars:
             self.sw_vars['ansible_inventory'] = None
         if 'ansible_become_pass' not in self.sw_vars:
@@ -337,6 +368,7 @@ class software(object):
                     os.mkdir(abs_temp_dir)
                     # os.mknod(test_file)
                     with open(test_path, 'x') as f:
+                        _ = f  # tox mug
                         pass
                 except:
                     self.log.error('Failed trying to create temporary file '
@@ -1834,7 +1866,7 @@ class software(object):
             elif (task['description'] ==
                     "Check WMLA License acceptance and install to root"):
                 _interactive_wmla_license_accept(
-                    self.sw_vars['ansible_inventory'])
+                    self.sw_vars['ansible_inventory'], self.eval_ver)
             extra_args = ''
             if 'hosts' in task:
                 extra_args = f"--limit \'{task['hosts']},localhost\'"
@@ -1947,7 +1979,7 @@ def _interactive_anaconda_license_accept(ansible_inventory, ana_path):
     return rc
 
 
-def _interactive_wmla_license_accept(ansible_inventory):
+def _interactive_wmla_license_accept(ansible_inventory, eval_ver):
     log = logger.getlogger()
 
     cmd = (f'ansible-inventory --inventory {ansible_inventory} --list')
@@ -1956,7 +1988,10 @@ def _interactive_wmla_license_accept(ansible_inventory):
 
     # accept_cmd = 'IBM_POWERAI_LICENSE_ACCEPT=yes;/opt/anaconda3/bin/accept-ibm-wmla-license.sh '
     accept_cmd = 'sudo env IBM_POWERAI_LICENSE_ACCEPT=yes /opt/anaconda3/bin/accept-ibm-wmla-license.sh '
-    check_cmd = 'ls ~/.powerai/ibm-wmla-license/1.2.0/license/status.dat'
+    if eval_ver:
+        check_cmd = 'ls ~/.powerai/ibm-wmla-license-eval/1.2.0/license/status.dat'
+    else:
+        check_cmd = 'ls ~/.powerai/ibm-wmla-license/1.2.0/license/status.dat'
 
     print(bold('Acceptance of the WMLA Enterprise license is required on '
                'all nodes in the cluster.'))
