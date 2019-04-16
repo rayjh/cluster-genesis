@@ -118,7 +118,19 @@ class software(object):
             self.sw_vars = {}
             self.sw_vars['init-time'] = time.ctime()
 
-        self.root_dir_nginx = '/srv'
+        self.root_dir_nginx = '/srv/pup'
+        if not os.path.isdir(f'{self.root_dir_nginx}'):
+            os.makedirs(f'{self.root_dir_nginx}')
+            cmd = f'sudo chcon -Rv --type=httpd_sys_content_t {self.root_dir_nginx}'
+            resp, err, rc = sub_proc_exec(cmd)
+            if rc != 0:
+                self.log.error('An error occurred while setting access \n'
+                               f'permissions for directory {self.root_dir_nginx}.\n'
+                               'This may cause http access problems if SELinux '
+                               'is running')
+                if not get_yesno('Continue ?'):
+                    sys.exit('Exit at user request')
+
         if base_dir is not None:
             base_dir = base_dir.replace('/', '')
             if base_dir:
@@ -150,7 +162,7 @@ class software(object):
         self.sw_vars['arch'] = self.arch
 
         if os.path.isdir('/srv/wmla-license') and not os.path.isdir(self.root_dir):
-            msg = ('This version of the PowerUp software server utilizes a new '
+            msg = ('\nThis version of the PowerUp software server utilizes a new '
                    'directory layout.\n'
                    f'No software server content exists under {self.root_dir}\n'
                    'PowerUp can copy or move your existing repositories.')
@@ -159,7 +171,7 @@ class software(object):
                          'repositories? '):
 
                 import create_base_dir_wmla120
-                create_base_dir_wmla120.create_base_dir()
+                create_base_dir_wmla120.create_base_dir(self.root_dir_nginx)
 
         if 'ansible_inventory' not in self.sw_vars:
             self.sw_vars['ansible_inventory'] = None

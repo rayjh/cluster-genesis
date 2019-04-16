@@ -25,14 +25,14 @@ import lib.logger as logger
 from lib.utilities import sub_proc_exec, get_selection, get_yesno
 
 
-def create_base_dir():
+def create_base_dir(base_dir):
     log = logger.getlogger()
     print('\nMove or Copy the existing software server directories?')
     ch, action = get_selection('move\ncopy', ('m', 'c'))
     if action == 'copy':
-        statvfs = os.statvfs('/srv/')
+        statvfs = os.statvfs(base_dir)
         freespace = statvfs.f_frsize * statvfs.f_bavail
-        if freespace < 15000000000:
+        if freespace < 18000000000:
             sys.exit('Insufficient space on disk')
     arch = ''
     exists = glob('/srv/repos/dependencies/rhel7/*')
@@ -49,25 +49,26 @@ def create_base_dir():
     if not arch:
         log.error('\nUnable to determine architecture. Unable to perform move.\n')
         sys.exit()
-    if os.path.exists(f'/srv/wmla120-{arch}'):
-        print(f'Destination path /srv/wmla120-{arch} already exists.')
+    if os.path.exists(f'{base_dir}/wmla120-{arch}'):
+        print(f'Destination path {base_dir}/wmla120-{arch} already exists.')
         if action == 'copy':
             if not get_yesno('Okay to proceed with force copy? '):
                 sys.exit('Exit at user request')
     else:
-        os.mkdir(f'/srv/wmla120-{arch}/')
-    for _dir in (('repos', 'anaconda', 'spectrum-conductor', 'spectrum-dli', 'wmla-license',)):
+        os.mkdir(f'{base_dir}/wmla120-{arch}/')
+    for _dir in (('repos', 'anaconda', 'spectrum-conductor', 'spectrum-dli',
+                  'wmla-license',)):
         path = os.path.join('/srv/', _dir, '')
 
         if os.path.isdir(path):
             print(f'Found dir: {path}')
             if action == 'move':
                 try:
-                    move(path, f'/srv/wmla120-{arch}/')
+                    move(path, f'{base_dir}/wmla120-{arch}/')
                 except shutil_Error as exc:
                     print(exc)
             elif action == 'copy':
-                cmd = f'cp -rf {path} /srv/wmla120-{arch}/'
+                cmd = f'cp -rf {path} {base_dir}/wmla120-{arch}/'
                 try:
                     _, err, rc = sub_proc_exec(cmd)
                 except:
