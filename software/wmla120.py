@@ -449,9 +449,9 @@ class software(object):
             print('The PowerUp software installer utilizes Nginx web server.')
             print('Nginx will run without the Firewall enabled, but it is \n'
                   'advisable to utilize a firewall when running a web server.')
-            if not get_yesno('\nContinue with installation? ', default='y'):
-                self.log.info('Exiting at user request')
-                sys.exit()
+#            if not get_yesno('\nContinue with installation? ', default='y'):
+#                self.log.info('Exiting at user request')
+#                sys.exit()
 
     def _setup_nginx_server(self, eval_ver=False, non_int=False):
         # nginx setup
@@ -1731,7 +1731,7 @@ class software(object):
 
                 filename = repo_id + '-powerup.repo'
                 if _dir:
-                    repo = PowerupRepo(repo_id, repo_name, self.arch,
+                    repo = PowerupRepo(repo_id, repo_name, self.root_dir, self.arch,
                                        self.proc_family)
                     dotrepo_content = repo.get_yum_dotrepo_content(repo_dir=_dir,
                                                                    gpgcheck=0,

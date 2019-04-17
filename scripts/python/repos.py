@@ -301,13 +301,13 @@ class PowerupRepo(object):
 
         # name
         content += f'name={self.repo_name}\n'
-
         # repo url
         if local:
             content += f'baseurl=file://{repo_dir}/\n'
         elif client:
-            d = repo_dir.lstrip('/')
-            d = d.lstrip('srv')
+            rstrip = len(self.repo_base_dir) - \
+                len(self.repo_base_dir.rstrip('/').split('/')[-1]) - 2
+            d = repo_dir[rstrip:]
             content += 'baseurl=http://{{ host_ip.stdout }}' + f'{d}/\n'
         elif metalink:
             content += f'metalink={url}\n'
