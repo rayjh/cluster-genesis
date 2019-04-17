@@ -44,7 +44,7 @@ def nginx_setup(root_dir='/srv', repo_id='nginx'):
     if os.path.isfile(repo_file):
         with open(repo_file, 'r') as f:
             content = f.read()
-        if not baseurl in content:
+        if baseurl not in content:
             line_in_file(repo_file, r'^baseurl=.+', f'baseurl={baseurl}')
             for cmd in ['yum clean all', 'yum makecache']:
                 resp, err, rc = sub_proc_exec(cmd)

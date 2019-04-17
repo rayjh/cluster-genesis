@@ -43,7 +43,8 @@ from software_hosts import get_ansible_inventory, validate_software_inventory
 from lib.utilities import sub_proc_display, sub_proc_exec, heading1, Color, \
     get_selection, get_yesno, rlinput, bold, ansible_pprint, replace_regex, \
     parse_rpm_filenames, lscpu
-from lib.genesis import GEN_SOFTWARE_PATH, get_ansible_playbook_path, get_playbooks_path
+from lib.genesis import GEN_SOFTWARE_PATH, get_ansible_playbook_path, \
+    get_playbooks_path, get_nginx_root_dir
 from nginx_setup import nginx_setup
 
 ENVIRONMENT_VARS = {
@@ -118,7 +119,7 @@ class software(object):
             self.sw_vars = {}
             self.sw_vars['init-time'] = time.ctime()
 
-        self.root_dir_nginx = '/srv/pup'
+        self.root_dir_nginx = get_nginx_root_dir()
         if not os.path.isdir(f'{self.root_dir_nginx}'):
             os.makedirs(f'{self.root_dir_nginx}')
             cmd = f'sudo chcon -Rv --type=httpd_sys_content_t {self.root_dir_nginx}'
@@ -456,7 +457,7 @@ class software(object):
         # nginx setup
         heading1('Set up Nginx')
 
-        #if not self._is_nginx_running():
+        # if not self._is_nginx_running():
         nginx_setup(root_dir=self.root_dir_nginx, repo_id='nginx')
 
         exists = self.status_prep(which='Nginx Web Server')
