@@ -921,6 +921,7 @@ class software(object):
         item = self.content[ana_name]
         ana_src = item.fileglob.format(arch=self.arch)
         ana_url = item.source.url
+        ana_dir = item.path
         if f'{ana_name}_alt_url' in self.sw_vars:
             alt_url = self.sw_vars[f'{ana_name}_alt_url']
         else:
@@ -936,8 +937,8 @@ class software(object):
         if not exists or get_yesno(f'Recopy {ana_name} '):
 
             src_path, dest_path, state = setup_source_file(ana_name, ana_src,
-                                                           self.root_dir, ana_url,
-                                                           alt_url=alt_url)
+                                                           ana_dir, self.root_dir,
+                                                           ana_url, alt_url=alt_url)
             if dest_path:
                 self.sw_vars['content_files'][get_name_dir(ana_name)] = dest_path
             if src_path and 'http' in src_path:
