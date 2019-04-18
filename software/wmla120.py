@@ -327,6 +327,8 @@ class software(object):
                 if os.path.exists(f'{self.root_dir}repos/{item.repo_id}/simple/') and \
                         len(os.listdir(f'{self.root_dir}repos/{item.repo_id}/simple/')) >= 1:
                     self.state[item.desc] = 'Setup'
+                else:
+                    self.state[item.desc] = '-'
 
             # Nginx web server status
             if item == 'Nginx Web Server' and self._is_nginx_running():
@@ -398,8 +400,8 @@ class software(object):
             heading1(f'Preparation Summary for {self.repo_shortname}')
             for item in self.state:
                 status = self.state[item]
-                it = (item + '                              ')[:38]
-                print(f'  {it:<39} : ' + status)
+                it = (item + '                              ')[:39]
+                print(f'  {it:<40} : ' + status)
                 exists = exists and self.state[item] != '-'
 
             gtg = 'Preparation complete. '
@@ -1350,9 +1352,7 @@ class software(object):
         self.status_prep()
 
     def prep_post(self, eval_ver=False, non_int=False):
-        # write software-vars file. Although also done in __del__, the software
-        # vars files are written here in case the user is running all phases of
-        # install
+        # write software-vars file.
         try:
             if 'ana_powerup_repo_channels' in self.sw_vars:
                 chan_list = []
@@ -1468,7 +1468,9 @@ class software(object):
         print(bold(f'\nInitializing clients for install from  Repository : '
               f'{self.repo_shortname}\n'))
         self.sw_vars['init_clients'] = self.repo_shortname
+
         self._update_software_vars()
+
         self.sw_vars['ansible_inventory'] = get_ansible_inventory()
 
         sudo_password = None
@@ -1619,7 +1621,7 @@ class software(object):
         Returns: A list of sorted paths. For rpm files, the newest version
         will be last
         """
-        paths = glob.glob(f'{self.root_dir}**/{fileglob}')
+        paths = glob.glob(f'{self.root_dir}**/{fileglob}', recursive=True)
         paths = sorted(paths)
         return paths
 
@@ -1656,6 +1658,7 @@ class software(object):
         self.sw_vars['content_files'] = {}
         self.sw_vars['ana_powerup_repo_channels'] = []
         self.sw_vars['yum_powerup_repo_files'] = {}
+        self.sw_vars['root_dir_nginx'] = self.root_dir_nginx
         for _item in self.content:
             item = self.content[_item]
             if item.type == 'file':
@@ -1695,7 +1698,7 @@ class software(object):
                 else:
                     self.log.error(f'No {repo_name} found in software server.')
                     _dir = ''
-                _dir = _dir[len(self.root_dir) - 1:]
+                _dir = _dir[len(self.root_dir_nginx):]
                 # form .condarc channel entry. Note that conda adds
                 # the corresponding 'noarch' channel automatically.
                 if _dir:
@@ -1739,6 +1742,14 @@ class software(object):
                     self.sw_vars['yum_powerup_repo_files'][filename] = dotrepo_content
                 else:
                     self.sw_vars['yum_powerup_repo_files'][filename] = ''
+            elif item.type == 'simple':
+                path = self._get_file_paths(item.type)
+                if path:
+                    path = path[0]
+                    self.sw_vars['pypi_repo_path'] = path
+                    self.sw_vars['pypi_http_path'] = path[len(self.root_dir_nginx):]
+                else:
+                    self.sw_vars['pypi_repo_path'] = ''
 
     def _install_ready(self):
         ready = True
