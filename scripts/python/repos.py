@@ -76,7 +76,7 @@ def setup_source_file(name, src_glob, dest_dir, base_dir, url='', alt_url='http:
                                  allow_none=True)
 
         if ch == 'U':
-            _url = alt_url if alt_url else 'http://'
+            _url = alt_url if alt_url else 'http://<host>/'
             if url:
                 ch1, item = get_selection('Public web site.Alternate web site', 'P.A',
                                           'Select source: ', '.')
@@ -89,7 +89,7 @@ def setup_source_file(name, src_glob, dest_dir, base_dir, url='', alt_url='http:
                     abs_dest_dir = f'{base_dir}{dest_dir}'
                     if not os.path.exists(dest_dir):
                         os.mkdir(dest_dir)
-                    cmd = f'wget -r -l 1 -nH -np --cut-dirs=1 -P {abs_dest_dir} {_url}'
+                    cmd = f'wget -P {abs_dest_dir} {_url}'
                     rc = sub_proc_display(cmd)
                     if rc != 0:
                         log.error(f'Failed downloading {name} source to'
@@ -101,7 +101,7 @@ def setup_source_file(name, src_glob, dest_dir, base_dir, url='', alt_url='http:
                         copied = True
                     if src2:
                         _url2 = os.path.join(os.path.dirname(_url), src2)
-                        cmd = f'wget -r -l 1 -nH -np --cut-dirs=1 -P {abs_dest_dir} {_url2}'
+                        cmd = f'wget -P {abs_dest_dir} {_url2}'
                         rc = sub_proc_display(cmd)
                         if rc != 0:
                             log.error(f'Failed downloading {name} source file {src2} to'
@@ -180,6 +180,13 @@ def powerup_file_from_disk(name, file_glob, base_dir):
 class PowerupRepo(object):
     """Base class for creating a yum repository for access by POWER-Up software
      clients.
+    Args:
+        repo_id (str): ID for the repo. For yum repos, this is the yum repo id.
+        repo_name (str):
+        repo_base_dir (str): This is the base directory for the repository. In the
+            case of software install modules, it is the catenation of root_dir_nginx
+            and the base_dir (base_dir for software install modules is typically
+            derived from the install module name or user provided)
     """
     def __init__(self, repo_id, repo_name, repo_base_dir, arch='ppc64le',
                  proc_family='family', rhel_ver='7'):
@@ -250,7 +257,8 @@ class PowerupRepo(object):
                 break
             if ch == 'A':
                 if not alt_url:
-                    alt_url = f'http://host/repos/{self.repo_id}/'
+                    base_name = self.repo_base_dir.strip('/').split('/')[-1]
+                    alt_url = f'http://<host>/{base_name}/repos/{self.repo_id}/'
                 _url = get_url(alt_url, prompt_name=self.repo_name,
                                repo_chk=self.repo_type, contains=contains,
                                excludes=excludes, filelist=filelist)
@@ -463,7 +471,7 @@ class PowerupYumRepoFromRepo(PowerupRepo):
     def sync(self):
         self.log.info(f'Syncing {self.repo_name}')
         self.log.info('This can take many minutes or hours for large repositories\n')
-        cmd = (f'reposync -a {self.arch} -r {self.repo_id} -p'
+        cmd = (f'reposync -a {self.arch} -r {self.repo_id} -p '
                f'{os.path.dirname(self.yumrepo_dir)} -l -m')
         rc = sub_proc_display(cmd)
         if rc != 0:

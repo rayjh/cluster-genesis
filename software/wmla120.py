@@ -59,6 +59,15 @@ class software(object):
     repositories, download files to the installer node or perform other
     initialization activities. The install method implements the actual
     installation.
+    Args:
+        eval_ver (bool): Set to True to install the evaluation version of WMLA
+        non_int (bool): Set True to run non-interactively (not yet implemented)
+        arch (str): ppc64le or x86_64
+        proc_family (str): p8 or p8
+        engr_mode (bool): Set true to gather package dependencies
+        base_dir (str): Name of the directory to use. This can only be a
+            depth of one (no slashes)('/'). This directory name will be
+            appended to the root_dir_nginx directory.
     """
     def __init__(self, eval_ver=False, non_int=False, arch='ppc64le',
                  proc_family=None, engr_mode=False, base_dir=None):
@@ -133,6 +142,7 @@ class software(object):
                     sys.exit('Exit at user request')
 
         if base_dir is not None:
+            # force to single level directory
             base_dir = base_dir.replace('/', '')
             if base_dir:
                 self.root_dir = f'{self.root_dir_nginx}/{base_dir}/'
@@ -514,10 +524,11 @@ class software(object):
                                          'P\nrpm\nA\nS',
                                          'Repository source? ')
             else:
-                ch, item = get_selection('Create from package files in a local Directory\n'
-                                         'Sync from an alternate Repository\n'
+                ch, item = get_selection('Sync required packages from public repo.\n'
+                                         'Create from Nvidia "local" driver RPM.\n'
+                                         'Sync from an alternate Repository.\n'
                                          'Skip',
-                                         'D\nR\nS',
+                                         'P\nrpm\nA\nS',
                                          'Repository source? ')
 
         if ch == 'P':
@@ -683,7 +694,7 @@ class software(object):
         if f'{name}_alt_url' in self.sw_vars:
             alt_url = self.sw_vars[f'{name}_alt_url']
         else:
-            alt_url = 'http://'
+            alt_url = 'http://<host>/'
 
         if exists:
             self.log.info('WMLA Enterprise license exists already in the POWER-Up '
@@ -713,7 +724,7 @@ class software(object):
         if f'{name}_alt_url' in self.sw_vars:
             alt_url = self.sw_vars[f'{name}_alt_url']
         else:
-            alt_url = 'http://'
+            alt_url = 'http://<host>/'
 
         if exists:
             self.log.info('Spectrum conductor content exists already in the '
@@ -750,7 +761,7 @@ class software(object):
         if f'{name}_alt_url' in self.sw_vars:
             alt_url = self.sw_vars[f'{name}_alt_url']
         else:
-            alt_url = 'http://'
+            alt_url = 'http://<host>/'
 
         if exists:
             self.log.info('Spectrum DLI content exists already in the POWER-Up server')
@@ -888,7 +899,6 @@ class software(object):
                     alt_url = self.sw_vars[f'{repo_id}_alt_url']
                 else:
                     alt_url = None
-
                 repo = PowerupYumRepoFromRepo(repo_id, repo_name, self.root_dir,
                                               arch=self.arch,
                                               proc_family=self.proc_family)
@@ -905,7 +915,7 @@ class software(object):
                     repo.sync()
                     repo.create_meta()
 
-                    # Setup local access to the new repo copy in /srv/repo/
+                    # Setup local access to the new repo copy
                     # if platform.machine() == self.arch:
                     #    content = repo.get_yum_dotrepo_content(gpgcheck=0, local=True)
                     #    repo.write_yum_dot_repo_file(content)
@@ -927,7 +937,7 @@ class software(object):
         if f'{ana_name}_alt_url' in self.sw_vars:
             alt_url = self.sw_vars[f'{ana_name}_alt_url']
         else:
-            alt_url = 'http://'
+            alt_url = 'http://<host>/'
         exists = self.status_prep(which=item.name)
 
         heading1('Set up Anaconda\n')
