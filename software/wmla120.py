@@ -334,7 +334,7 @@ class software(object):
             if item == 'Firewall':
                 cmd = 'firewall-cmd --list-all'
                 resp, _, _ = sub_proc_exec(cmd)
-                if not '(active)' in resp:
+                if '(active)' not in resp:
                     self.state[item] = "Firewall is not running"
                 elif re.search(r'services:\s+.+http', resp):
                     self.state[item] = "Running and configured for http"
@@ -1785,9 +1785,11 @@ class software(object):
     def _init_clients_check(self):
         ready = True
         if 'init_clients' not in self.sw_vars:
-            self.log.error('Initialization of clients has not been run. Please run\n'
+            self.log.error('The PowerUp data base is missing information from the \n'
+                           'init clients stage of install. Please run \n'
                            'pup software --init-clients \n'
                            'before running install.')
+            sys.exit()
             ready = False
         if self.repo_shortname != self.sw_vars['init_clients']:
             self.log.warning('The cluster nodes were last configured for installation\n'
