@@ -620,59 +620,82 @@ class OSinstall(npyscreen.NPSAppManaged):
         pxe_ethernet_ifc = prof['pxe_ethernet_ifc']['val']
         bmc_ethernet_ifc = prof['bmc_ethernet_ifc']['val']
 
+        bmc_vlan = prof['bmc_vlan_number'].val
+        pxe_vlan = prof['pxe_vlan_number'].val
+
+        conflict_ifc = self.ifcs.is_vlan_used_elsewhere(bmc_vlan, bmc_ethernet_ifc)
+        if conflict_ifc and conflict_ifc != prof['pxe_ethernet_ifc'].val:
+            msg += [f'- Error - the chosen BMC vlan ({bmc_vlan}) is already in '
+                    f'use on another interface. ({conflict_ifc})']
+
+        conflict_ifc = self.ifcs.is_vlan_used_elsewhere(pxe_vlan, pxe_ethernet_ifc)
+        if conflict_ifc and conflict_ifc != prof['bmc_ethernet_ifc'].val:
+            msg += [f'- Error - the chosen PXE vlan ({pxe_vlan}) is already in '
+                    f'use on another interface. ({conflict_ifc})']
+
         ifc = self.ifcs.is_route_overlapping(pxe_cidr, pxe_ethernet_ifc)
         if ifc:
-            msg += ['- Warning, the subnet specified on the PXE interface',
+            msg += ['- Error - the subnet specified on the PXE interface',
                     f'  overlaps a subnet on interface {ifc}']
 
         ifc = self.ifcs.is_route_overlapping(bmc_cidr, bmc_ethernet_ifc)
         if ifc:
-            msg += ['- Warning, the subnet specified on the BMC interface',
+            msg += ['- Error - the subnet specified on the BMC interface',
                     f'  overlaps a subnet on interface {ifc}']
 
         if u.is_overlapping_addr(bmc_cidr, pxe_cidr):
-            msg += ['- Warning, BMC and PXE subnets are overlapping.']
+            msg += ['- Warning - BMC and PXE subnets are overlapping.']
 
         if bmc_subnet_prefix != pxe_subnet_prefix:
-            msg += ['- Warning, BMC and PXE subnets are different sizes']
+            msg += ['- Warning - BMC and PXE subnets are different sizes']
 
-        if prof.bmc_address_mode.val == "dhcp" and prof.bmc_ethernet_ifc.val:
-            dhcp = u.get_dhcp_servers(prof.bmc_ethernet_ifc.val)
-            if dhcp:
-                msg += ['- Warning a DHCP server exists already on',
-                        '  the interface specified for BMC access. ',
-                        f'  Offered address: {dhcp["IP Offered"]}',
-                        f'  From server:     {dhcp["Server Identifier"]}']
-
-        if prof.pxe_ethernet_ifc.val:
-            dhcp = u.get_dhcp_servers(prof.pxe_ethernet_ifc.val)
-            if dhcp:
-                msg += ['- Warning a DHCP server exists already on',
-                        '  the interface specified for PXE access. ',
-                        f'  Offered address: {dhcp["IP Offered"]}',
-                        f'  From server:     {dhcp["Server Identifier"]}']
+#        if prof.bmc_address_mode.val == "dhcp" and prof.bmc_ethernet_ifc.val:
+#            dhcp = u.get_dhcp_servers(prof.bmc_ethernet_ifc.val)
+#            if dhcp:
+#                msg += ['- Warning a DHCP server exists already on',
+#                        '  the interface specified for BMC access. ',
+#                        f'  Offered address: {dhcp["IP Offered"]}',
+#                        f'  From server:     {dhcp["Server Identifier"]}']
+#
+#        if prof.pxe_ethernet_ifc.val:
+#            dhcp = u.get_dhcp_servers(prof.pxe_ethernet_ifc.val)
+#            if dhcp:
+#                msg += ['- Warning a DHCP server exists already on',
+#                        '  the interface specified for PXE access. ',
+#                        f'  Offered address: {dhcp["IP Offered"]}',
+#                        f'  From server:     {dhcp["Server Identifier"]}']
 
         return msg
 
     def config_interfaces(self):
-        p = self.prof.get_profile_tuple()
+        #u.breakpoint()
+        p = self.prof.get_network_profile_tuple()
         bmc_ifc = p.bmc_ethernet_ifc
         pxe_ifc = p.pxe_ethernet_ifc
 
+        up_ifcs = self.ifcs.get_up_interfaces_names()
+        if not bmc_ifc in up_ifcs:
         # create tagged vlan interfaces if any
-        if p.bmc_vlan_number:
-            bmc_ifc = p.bmc_ethernet_ifc + '.' + p.bmc_vlan_number
-            if not self.ifcs.is_vlan_used_elsewhere(p.bmc_vlan_number,
-                                                    bmc_ifc):
-                self.ifcs.create_tagged_ifc(p.bmc_ethernet_ifc,
-                                            p.bmc_vlan_number)
+            if p.bmc_vlan_number:
+                if p.bmc_vlan_number not in p.bmc_ethernet_ifc:
+                    bmc_ifc = p.bmc_ethernet_ifc + '.' + p.bmc_vlan_number
+                if not self.ifcs.is_vlan_used_elsewhere(p.bmc_vlan_number,
+                                                        bmc_ifc):
+                    self.ifcs.create_tagged_ifc(p.bmc_ethernet_ifc,
+                                                p.bmc_vlan_number)
+            else:
+                pass  # create untagged ifc here
 
-        if p.pxe_vlan_number:
-            pxe_ifc = p.pxe_ethernet_ifc + '.' + p.pxe_vlan_number
-            if not self.ifcs.is_vlan_used_elsewhere(p.pxe_vlan_number,
-                                                    pxe_ifc):
-                self.ifcs.create_tagged_ifc(p.pxe_ethernet_ifc,
-                                            p.pxe_vlan_number)
+        if not pxe_ifc in up_ifcs:
+            if p.pxe_vlan_number:
+                if p.pxe_vlan_number not in p.pxe_ethernet_ifc:
+                    pxe_ifc = p.pxe_ethernet_ifc + '.' + p.pxe_vlan_number
+                if not self.ifcs.is_vlan_used_elsewhere(p.pxe_vlan_number,
+                                                        pxe_ifc):
+                    self.ifcs.create_tagged_ifc(p.pxe_ethernet_ifc,
+                                                p.pxe_vlan_number)
+            else:
+                pass  # create untagged ifc here
 
         if not self.ifcs.find_unused_addr_and_add_to_ifc(bmc_ifc,
                                                          p.bmc_subnet_cidr):
@@ -682,6 +705,23 @@ class OSinstall(npyscreen.NPSAppManaged):
                                                          p.pxe_subnet_cidr):
             self.log.error(f'Failed to add an addr to {pxe_ifc}')
 
+        return
+#        if p.bmc_address_mode.val == "dhcp" and p.bmc_ethernet_ifc.val:
+#            dhcp = u.get_dhcp_servers(p.bmc_ethernet_ifc.val)
+#            if dhcp:
+#                msg += ['- Warning a DHCP server exists already on',
+#                        '  the interface specified for BMC access. ',
+#                        f'  Offered address: {dhcp["IP Offered"]}',
+#                        f'  From server:     {dhcp["Server Identifier"]}']
+#
+#        if prof.pxe_ethernet_ifc.val:
+#            dhcp = u.get_dhcp_servers(p.pxe_ethernet_ifc.val)
+#            if dhcp:
+#                msg += ['- Warning a DHCP server exists already on',
+#                        '  the interface specified for PXE access. ',
+#                        f'  Offered address: {dhcp["IP Offered"]}',
+#                        f'  From server:     {dhcp["Server Identifier"]}']
+#####################################
 #            cmd = f'nmap -PR {p.bmc_subnet_cidr}'
 #            res, err, rc = u.sub_proc_exec(cmd)
 #            if rc != 0:
@@ -976,17 +1016,21 @@ class Pup_form(npyscreen.ActionFormV2):
                     self.form[item]['val'] = self.fields[item].value
         if not fld_error:
             popmsg = ['Validating network profile']
-            if (hasattr(self.form, 'bmc_address_mode')):
-                if (self.form.bmc_address_mode.val == 'dhcp' or
-                        self.form.pxe_ethernet_ifc.val):
-                    popmsg += ['and checking for existing DHCP servers']
+#            if (hasattr(self.form, 'bmc_address_mode')):
+#                if (self.form.bmc_address_mode.val == 'dhcp' or
+#                        self.form.pxe_ethernet_ifc.val):
+#                    popmsg += ['and checking for existing DHCP servers']
+            npyscreen.notify(popmsg, title='Info')
+            msg += self.parentApp.is_valid_profile(self.form)
+            sleep(1)
+
+            if 'Error' in ' '.join(msg):
+                val_error = True
+            else:
+                popmsg = ['Configuring network interfaces']
                 npyscreen.notify(popmsg, title='Info')
                 sleep(1)
-
-            msg += self.parentApp.is_valid_profile(self.form)
-            if 'Error' in msg:
-                val_error = True
-
+                self.parentApp.config_interfaces()
             if not fld_error or val_error:
                 res = True
                 if msg:
@@ -1003,6 +1047,7 @@ class Pup_form(npyscreen.ActionFormV2):
                     if self.parentApp.NEXT_ACTIVE_FORM == 'MAIN':
                         self.parentApp.prof.update_network_profile(self.form)
                         self.next_form = 'NODE'
+
                         self.configure_services()
                     elif self.parentApp.NEXT_ACTIVE_FORM == 'NODE':
                         self.parentApp.prof.update_node_profile(self.form)
@@ -1013,7 +1058,7 @@ class Pup_form(npyscreen.ActionFormV2):
                         self.next_form = None
 
         elif fld_error or val_error:
-            msg += ['Please reslove issues.']
+            msg += ['Please resolve issues.']
             npyscreen.notify_confirm(msg, title='cancel', editw=1)
             # stay on this form
             self.next_form = self.parentApp.NEXT_ACTIVE_FORM
@@ -1482,19 +1527,6 @@ class Pup_form(npyscreen.ActionFormV2):
                 Pup_form.pxeboot_enabled = False
             self.fields['status_table'].values = (
                 get_install_status(NODE_STATUS, colorized=False).splitlines())
-
-
-def validate(profile_tuple):
-    LOG = logger.getlogger()
-    if profile_tuple.bmc_address_mode == "dhcp" or (
-            profile_tuple.pxe_address_mode == "dhcp"):
-        hasDhcpServers = u.has_dhcp_servers(profile_tuple.ethernet_port)
-        if not hasDhcpServers:
-            LOG.warn("No Dhcp servers found on {0}".format(
-                profile_tuple.ethernet_port))
-        else:
-            LOG.info("Dhcp servers found on {0}".format(
-                profile_tuple.ethernet_port))
 
 
 def main(prof_path):
