@@ -1935,7 +1935,6 @@ class software(object):
                            'pup software --init-clients \n'
                            'before running install.')
             sys.exit()
-            ready = False
         if self.repo_shortname != self.sw_vars['init_clients']:
             self.log.warning('The cluster nodes were last configured for installation\n'
                              'from self.sw_vars["init_clients"], but you are requesting\n'
