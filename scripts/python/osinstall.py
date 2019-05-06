@@ -669,6 +669,7 @@ class OSinstall(npyscreen.NPSAppManaged):
 
     def config_interfaces(self):
         #u.breakpoint()
+        msg = []
         p = self.prof.get_network_profile_tuple()
         bmc_ifc = p.bmc_ethernet_ifc
         pxe_ifc = p.pxe_ethernet_ifc
@@ -700,12 +701,14 @@ class OSinstall(npyscreen.NPSAppManaged):
         if not self.ifcs.find_unused_addr_and_add_to_ifc(bmc_ifc,
                                                          p.bmc_subnet_cidr):
             self.log.error(f'Failed to add an addr to {bmc_ifc}')
+            msg += f'Failed to add an addr to {bmc_ifc}'
 
         if not self.ifcs.find_unused_addr_and_add_to_ifc(pxe_ifc,
                                                          p.pxe_subnet_cidr):
             self.log.error(f'Failed to add an addr to {pxe_ifc}')
+            msg += f'Failed to add an addr to {pxe_ifc}'
 
-        return
+        return msg
 #        if p.bmc_address_mode.val == "dhcp" and p.bmc_ethernet_ifc.val:
 #            dhcp = u.get_dhcp_servers(p.bmc_ethernet_ifc.val)
 #            if dhcp:
@@ -1014,54 +1017,81 @@ class Pup_form(npyscreen.ActionFormV2):
                     self.form[item]['val'] = None
                 else:
                     self.form[item]['val'] = self.fields[item].value
-        if not fld_error:
+
+        if fld_error:
+            msg += ['---------------------',
+                'Continue with OS install?',
+                '(No to continue editing the profile data)']
+
+            editw = 1 if len(msg) < 10 else 0
+            res = npyscreen.notify_yes_no(msg, title='Profile validation',
+                                          editw=editw)
+
+        val_error = False
+        if (not fld_error) or res:
             popmsg = ['Validating network profile']
-#            if (hasattr(self.form, 'bmc_address_mode')):
-#                if (self.form.bmc_address_mode.val == 'dhcp' or
-#                        self.form.pxe_ethernet_ifc.val):
-#                    popmsg += ['and checking for existing DHCP servers']
             npyscreen.notify(popmsg, title='Info')
-            msg += self.parentApp.is_valid_profile(self.form)
+            msg = self.parentApp.is_valid_profile(self.form)
             sleep(1)
 
             if 'Error' in ' '.join(msg):
                 val_error = True
-            else:
-                popmsg = ['Configuring network interfaces']
-                npyscreen.notify(popmsg, title='Info')
-                sleep(1)
-                self.parentApp.config_interfaces()
-            if not fld_error or val_error:
-                res = True
-                if msg:
-                    msg += ['---------------------',
-                            'Continue with OS install?',
-                            '(No to continue editing the profile data)']
 
-                    editw = 1 if len(msg) < 10 else 0
-                    res = npyscreen.notify_yes_no(msg,
-                                                  title='Profile validation',
-                                                  editw=editw)
+        if val_error:
+            msg += ['---------------------',
+                'Continue with OS install?',
+                '(No to continue editing the profile data)']
 
-                if res:
-                    if self.parentApp.NEXT_ACTIVE_FORM == 'MAIN':
-                        self.parentApp.prof.update_network_profile(self.form)
-                        self.next_form = 'NODE'
+            editw = 1 if len(msg) < 10 else 0
+            res = npyscreen.notify_yes_no(msg, title='Profile validation',
+                                          editw=editw)
+        else:
+            res = True
 
-                        self.configure_services()
-                    elif self.parentApp.NEXT_ACTIVE_FORM == 'NODE':
-                        self.parentApp.prof.update_node_profile(self.form)
-                        self.initiate_os_installation()
-                        self.next_form = 'STATUS'
-                    elif self.parentApp.NEXT_ACTIVE_FORM == 'STATUS':
-                        self.parentApp.prof.update_status_profile(self.form)
-                        self.next_form = None
+        if res:
+            popmsg = ['Configuring network interfaces']
+            npyscreen.notify(popmsg, title='Info')
+            sleep(1)
+            msg = self.parentApp.config_interfaces()
 
-        elif fld_error or val_error:
-            msg += ['Please resolve issues.']
-            npyscreen.notify_confirm(msg, title='cancel', editw=1)
+            u.breakpoint()
+
+            val_error = True if 'Error' in ' '.join(msg) else False
+
+        if val_error:
+            msg += ['---------------------',
+                'Continue with OS install?',
+                '(No to continue editing the profile data)']
+
+            editw = 1 if len(msg) < 10 else 0
+            res = npyscreen.notify_yes_no(msg, title='Profile validation',
+                                          editw=editw)
+        else:
+            res = True
+
+
+        if res:
+            if self.parentApp.NEXT_ACTIVE_FORM == 'MAIN':
+                self.parentApp.prof.update_network_profile(self.form)
+                self.next_form = 'NODE'
+
+                self.configure_services()
+            elif self.parentApp.NEXT_ACTIVE_FORM == 'NODE':
+                self.parentApp.prof.update_node_profile(self.form)
+                self.initiate_os_installation()
+                self.next_form = 'STATUS'
+            elif self.parentApp.NEXT_ACTIVE_FORM == 'STATUS':
+                self.parentApp.prof.update_status_profile(self.form)
+                self.next_form = None
+        else:
             # stay on this form
             self.next_form = self.parentApp.NEXT_ACTIVE_FORM
+
+#        elif fld_error or val_error:
+#            msg += ['Please resolve issues.']
+#            npyscreen.notify_confirm(msg, title='cancel', editw=1)
+#            # stay on this form
+#            self.next_form = self.parentApp.NEXT_ACTIVE_FORM
 
     def get_mask_and_prefix(self, mask_prefix):
         """ Extracts a mask and prefix from a string containing a mask and / or
