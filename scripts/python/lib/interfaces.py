@@ -22,7 +22,7 @@ import re
 
 import lib.logger as logger
 from lib.utilities import is_overlapping_addr, add_offset_to_address,\
-    get_network_size, sub_proc_exec, breakpoint
+    get_network_size, sub_proc_exec
 
 
 class Interfaces(IPRoute):
@@ -233,7 +233,6 @@ class Interfaces(IPRoute):
         Returns: True or False
         """
         vlan_ifcs = self.get_vlan_interfaces(exclude=ifc)
-        #if int(vlan) in vlan_ifcs.values():
         conflict_ifc = ''
         for _ifc in vlan_ifcs:
             if int(vlan) == vlan_ifcs[_ifc]:
@@ -252,14 +251,14 @@ class Interfaces(IPRoute):
         if not self.link_lookup(ifname=tagged_ifc_name):
             self.log.debug(f'Creating vlan interface: {tagged_ifc_name}')
             res = self.link("add", ifname=tagged_ifc_name, kind="vlan",
-                                link=self.link_lookup(ifname=ifc)[0],
-                                vlan_id=int(vlan))
+                            link=self.link_lookup(ifname=ifc)[0],
+                            vlan_id=int(vlan))
             if res[0]['header']['error']:
                 self.log.error(f'Error creating vlan interface: {ifc} {res}')
                 passed = False
         if passed:
             self.link("set", index=self.link_lookup(ifname=tagged_ifc_name)[0],
-                          state="up")
+                      state="up")
             if not self._wait_for_ifc_up(tagged_ifc_name):
                 self.log.error('Failed to bring up interface {ifc} ')
                 passed = False

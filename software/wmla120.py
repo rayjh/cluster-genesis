@@ -1604,13 +1604,13 @@ class software(object):
 
     def init_clients(self):
         log = logger.getlogger()
-        
+
         print(bold(f'\n\n\n  Initializing clients for install from  Repository : '
               f'{self.repo_shortname}'))
         print(bold(f'  Architecture: {self.arch}'))
         print(bold(f'  Processor family: {self.proc_family}'))
         time.sleep(1.5)
-        
+
         self.sw_vars['init_clients'] = self.repo_shortname
 
         self._update_software_vars()
