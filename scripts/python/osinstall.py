@@ -67,7 +67,7 @@ def osinstall(profile_path):
         {'is_valid_profile': 'Validating network profile',
          'config_interfaces': 'Configuring network interfaces',
          'check_for_existing_dhcp': 'Checking for existing DHCP servers...',
-         'add_firewall_rules': ' Adding firewall rules',
+         'add_firewall_rules': 'Adding firewall rules',
          'install_and_configure_nginx': 'Installing and configuring Nginx...',
          'configure_dnsmasq': 'Configuring dsnmasq for DHCP'}
 
@@ -710,7 +710,6 @@ class OSinstall(npyscreen.NPSAppManaged):
                     self.ifcs.create_tagged_ifc(pxe_ifc, pxe_vlan)
                     pxe_ifc = pxe_ifc + '.' + pxe_vlan
             else:
-                print(pxe_ifc)
                 pass  # non tagged
 
         else:
@@ -1103,8 +1102,9 @@ class Pup_form(npyscreen.ActionFormV2):
         if self.parentApp.NEXT_ACTIVE_FORM in ('MAIN',):  # ('MAIN', 'NODE', 'STATUS'):
             on_ok_fns_list = self.parentApp.on_ok_fns_list[self.parentApp.NEXT_ACTIVE_FORM]
             if not fld_error or res:
+                popmsg = ''
                 for fn in on_ok_fns_list:
-                    popmsg = on_ok_fns_list[fn]
+                    popmsg += on_ok_fns_list[fn] + '\n'
                     npyscreen.notify(popmsg, title='Info')
                     msg = self.parentApp.on_ok_fns(fn, self.form,
                                                    self.parentApp.NEXT_ACTIVE_FORM)

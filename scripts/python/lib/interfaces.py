@@ -232,6 +232,11 @@ class Interfaces(IPRoute):
             ifc (str): Name of the interface to exclude from the check.
         Returns: True or False
         """
+        try:
+            vlan = int(vlan)
+        except (ValueError, TypeError):
+            return
+
         vlan_ifcs = self.get_vlan_interfaces(exclude=ifc)
         conflict_ifc = ''
         for _ifc in vlan_ifcs:
