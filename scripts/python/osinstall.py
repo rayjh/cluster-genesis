@@ -738,7 +738,7 @@ class Pup_form(npyscreen.ActionFormV2):
 
     def create(self, *args, **keywords):
         super(Pup_form, self).create(*args, **keywords)
-
+        self.log = logger.getlogger()
         self.keypress_timeout = 50  # hundreds of ms
         self.scan = False
         self.scanning = False
@@ -1409,30 +1409,48 @@ class Pup_form(npyscreen.ActionFormV2):
         # list for responding BMCs
         sn_pn_list = {}
 
+        bmc_type = ''
+
         for ip in node_list:
-            this_bmc = Bmc(ip, uid, pw, 'ipmi')
+            this_bmc = Bmc(ip, uid, pw, 'openbmc')
             if this_bmc.is_connected():
                 bmc_inst[ip] = this_bmc
+                bmc_type = 'openbmc'
 
-        # Create dict to hold inventory gathering sub process instances
-        sub_proc_instance = {}
-        # Start a sub process instance to gather inventory for each node.
-        for node in bmc_inst:
-            sub_proc_instance[node] = bmc_inst[node].\
-                get_system_inventory_in_background()
-        # poll for inventory gathering completion
-        st_time = time()
-        timeout = 15  # seconds
+        # No success with openbmc, try ipmi
+        if len(bmc_inst) == 0:
+            for ip in node_list:
+                this_bmc = Bmc(ip, uid, pw, 'ipmi')
+                if this_bmc.is_connected():
+                    bmc_inst[ip] = this_bmc
+                    bmc_type = 'ipmi'
 
-        while time() < st_time + timeout and len(sn_pn_list) < len(bmc_inst):
-            for node in sub_proc_instance:
-                if sub_proc_instance[node].poll() is not None:
-                    if (sub_proc_instance[node].poll() == 0 and
-                            node not in sn_pn_list):
-                        inv, stderr = sub_proc_instance[node].communicate()
-                        inv = inv.decode('utf-8')
-                        sn_pn_list[node] = bmc_inst[node].\
-                            extract_system_sn_pn(inv)
+        if bmc_type == 'ipmi':
+            # Create dict to hold inventory gathering sub process instances
+            sub_proc_instance = {}
+            # Start a sub process instance to gather inventory for each node.
+            for node in bmc_inst:
+                sub_proc_instance[node] = bmc_inst[node].\
+                    get_system_inventory_in_background()
+            # poll for inventory gathering completion
+            st_time = time()
+            timeout = 15  # seconds
+
+            while time() < st_time + timeout and len(sn_pn_list) < len(bmc_inst):
+                for node in sub_proc_instance:
+                    if sub_proc_instance[node].poll() is not None:
+                        if (sub_proc_instance[node].poll() == 0 and
+                                node not in sn_pn_list):
+                            inv, stderr = sub_proc_instance[node].communicate()
+                            inv = inv.decode('utf-8')
+                            sn_pn_list[node] = bmc_inst[node].\
+                                extract_system_sn_pn(inv)
+        elif bmc_type == 'openbmc':
+            for node in bmc_inst:
+                sn_pn_list[node] = bmc_inst[node].get_system_sn_pn()
+
+        else:
+            self.log.error('Not able to log into any BMCs')
 
         for node in bmc_inst:
             bmc_inst[node].logout()
