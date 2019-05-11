@@ -380,6 +380,12 @@ def get_system_info(host, session, timeout=5):
 
 
 def get_system_sn_pn(host, session, timeout=5):
+    """Get the sn and pn for a host
+    Args:
+        host(str): host ip or name
+        session(session object instance)
+    returns: tuple with sn and pn
+    """
     log = logger.getlogger()
 
     url = (f"https://{host}/xyz/openbmc_project/inventory/system")
