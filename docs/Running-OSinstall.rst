@@ -37,7 +37,7 @@ Node Selection
      :height: 350
      :align: center
 
-     Network interface setup
+     Node Selection
 
 **The Node Selection window**
 
