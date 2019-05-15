@@ -276,11 +276,11 @@ def chassisPower(host, op, session, timeout=5):
             res = session.get(url, headers=httpHeader, verify=False,
                               timeout=timeout)
         except(requests.exceptions.Timeout) as exc:
-            log.debug('BMC request timeout error. Host: {host}')
+            log.debug(f'BMC request timeout error. Host: {host}')
             log.debug(exc)
             res = None
         except(requests.exceptions.ConnectionError) as exc:
-            log.debug('BMC request connection error. Host: {host}')
+            log.debug(f'BMC request connection error. Host: {host}')
             log.debug(exc)
             res = None
         else:
