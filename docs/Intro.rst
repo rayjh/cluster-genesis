@@ -28,7 +28,7 @@ the installation ISO file, the PowerUp software scans the subnet for BMCs and
 displays a list of discovered nodes.  Nodes are listed with serial number, model
 and BMC MAC address. The user can select nodes from the list by simply scrolling
 through the list, pressing the space bar to select the desired nodes and click on
-'OK' to begin installation. A status screen shows intallation status.
+'OK' to begin installation. A status screen shows installation status.
 
 Software Installation Overview
 ------------------------------
@@ -47,7 +47,7 @@ to handle configuration tasks across a cluster.
 
 Cluster Deploymment Overview
 ----------------------------
-PowerUp's bare metal cluster deployment deploys a heterogenous cluster of
+PowerUp's bare metal cluster deployment deploys a heterogeneous cluster of
 compute nodes and Ethernet switches across one or more racks. PowerUp can
 configure simple flat networks for typical HPC
 environments or more advanced networks with VLANS and bridges for
